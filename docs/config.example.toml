@@ -7,9 +7,13 @@ host = "mac-studio"
 data_dir = "~/.local/share/tem-pad"
 # source ごとに保持する既読 event_id の上限 (重複排除用)
 dedupe_window = 5000
+# raw ログの保持日数。collect のたびに古いファイルを削除する。0 で自動削除なし
+raw_retention_days = 180
 
 [tailscale]
 enabled = true
+# 取得した生データを raw/ に保存する (再処理・証跡用)。各 source で個別に切れる
+save_raw = true
 # "-" は API 資格情報が属する tailnet
 tailnet = "-"
 audit_overlap_seconds = 60

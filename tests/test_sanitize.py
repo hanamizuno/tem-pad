@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from tem_pad.models import Event
+from tem_pad.procutil import CommandError, run_command
 from tem_pad.sanitize import redact_text, sanitize
 from tem_pad.storage import EventStore, RawStore
 
@@ -52,6 +56,7 @@ def test_event_store_creates_private_files_and_dirs(tmp_path: Path):
 def test_raw_store_directory_is_private(tmp_path: Path):
     raw = RawStore(tmp_path / "raw")
     path = raw.write_json("tailscale", "x", {"a": 1})
+    assert path is not None
     assert path.parent.stat().st_mode & 0o777 == 0o700
     assert path.stat().st_mode & 0o777 == 0o600
 
@@ -73,3 +78,14 @@ def test_recent_event_ids_reads_tail(tmp_path: Path):
     assert store.recent_event_ids("s", 100) == [f"id{i}" for i in range(10)]
     assert store.recent_event_ids("missing", 5) == []
     assert store.recent_event_ids("s", 0) == []
+
+
+def test_command_error_redacts_stderr():
+    script = (
+        "import sys; sys.stderr.write('auth failed for tskey-api-kSECRET0123456789'); sys.exit(1)"
+    )
+    with pytest.raises(CommandError) as excinfo:
+        run_command([sys.executable, "-c", script], timeout=10)
+    assert "kSECRET0123456789" not in str(excinfo.value)
+    assert "tskey-<redacted>" in str(excinfo.value)
+    assert excinfo.value.returncode == 1

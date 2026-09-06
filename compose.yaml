@@ -20,6 +20,17 @@ services:
       - ./deploy/loki/config.yaml:/etc/loki/config.yaml:ro
       - loki-data:/loki
     restart: unless-stopped
+    # 個人環境でホストを圧迫しないための控えめな上限。必要に応じて調整する
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          pids: 512
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/ready | grep -q ready"]
       interval: 15s
@@ -50,6 +61,16 @@ services:
       loki:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          pids: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   loki-data:

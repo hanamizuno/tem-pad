@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,6 +11,8 @@ import pytest
 
 from tem_pad.checks import CheckResult, Status
 from tem_pad.cli import main
+from tem_pad.collectors.base import CollectorContext, run_collector
+from tem_pad.collectors.little_snitch import LittleSnitchCollector
 from tem_pad.config import Config, GeneralConfig
 from tem_pad.doctor import general_checks, render
 from tem_pad.models import Event
@@ -126,3 +129,25 @@ enabled = false
     assert main(["-c", str(cfg), "collect", "all", "--dry-run"]) == 0
     out = capsys.readouterr().out
     assert out.count("skip") == 4
+
+
+def test_collector_skips_when_locked(tmp_path: Path):
+    cfg = Config(general=GeneralConfig(host="h", data_dir=tmp_path / "d"))
+    cfg.little_snitch.use_sudo = False
+    ctx = CollectorContext.from_config(cfg)
+    lock_path = ctx.states.path_for("little-snitch").with_suffix(".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a") as other:
+        fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # 別プロセス相当
+        result = run_collector(LittleSnitchCollector(), ctx)
+    assert result.skipped
+    assert "別プロセス" in (result.skip_reason or "")
+
+
+def test_raw_disabled_via_config(tmp_path: Path):
+    cfg = Config(general=GeneralConfig(host="h", data_dir=tmp_path / "d"))
+    cfg.proton_pass.save_raw = False
+    ctx = CollectorContext.from_config(cfg)
+    assert ctx.raw.enabled_for("proton-pass") is False
+    assert ctx.raw.enabled_for("tailscale") is True
+    assert cfg.raw_disabled_sources() == {"proton-pass"}

@@ -38,6 +38,8 @@ class GeneralConfig:
     data_dir: Path
     # 1 source あたり state に保持する既読 event_id の上限
     dedupe_window: int = 5000
+    # raw ログを保持する日数。0 以下なら自動削除しない
+    raw_retention_days: int = 180
 
 
 @dataclass(slots=True)
@@ -45,6 +47,8 @@ class TailscaleConfig:
     """``[tailscale]`` セクション。"""
 
     enabled: bool = True
+    # 取得した生データを raw/ に保存するか
+    save_raw: bool = True
     # ハイフン 1 文字は「API 資格情報が属する tailnet」を意味する Tailscale の省略記法
     tailnet: str = "-"
     api_base_url: str = "https://api.tailscale.com"
@@ -75,6 +79,7 @@ class ProtonPassConfig:
     """``[proton_pass]`` セクション。"""
 
     enabled: bool = True
+    save_raw: bool = True
     cli_path: str = "pass-cli"
     # agent monitor の --limit。Agent ごとの前回位置から差分を取る
     monitor_limit: int = 200
@@ -90,6 +95,7 @@ class LittleSnitchConfig:
     """``[little_snitch]`` セクション。"""
 
     enabled: bool = True
+    save_raw: bool = True
     cli_path: str = DEFAULT_LITTLE_SNITCH_CLI
     # littlesnitch は多くの操作で root を要求する。sudo 経由で実行するか
     use_sudo: bool = True
@@ -104,6 +110,7 @@ class DockerSandboxConfig:
     """``[docker_sandbox]`` セクション。"""
 
     enabled: bool = True
+    save_raw: bool = True
     mode: str = "auto"
     sbx_path: str = "sbx"
     # native audit JSONL の場所。空なら OS 既定 (macOS: ~/Library/Logs/...)
@@ -149,6 +156,16 @@ class Config:
         """state ファイルの置き場所。"""
         return self.general.data_dir / "state"
 
+    def raw_disabled_sources(self) -> set[str]:
+        """raw 保存を無効にした source 名の集合。"""
+        pairs = (
+            ("tailscale", self.tailscale.save_raw),
+            ("proton-pass", self.proton_pass.save_raw),
+            ("little-snitch", self.little_snitch.save_raw),
+            ("docker-sandbox", self.docker_sandbox.save_raw),
+        )
+        return {name for name, enabled in pairs if not enabled}
+
 
 def default_host() -> str:
     """ホスト名の既定値 (``.local`` などのサフィックスを除いた短い名前)。"""
@@ -191,11 +208,13 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         host=str(general_raw.get("host") or default_host()),
         data_dir=Path(str(general_raw.get("data_dir") or DEFAULT_DATA_DIR)).expanduser(),
         dedupe_window=_int(general_raw, "dedupe_window", 5000),
+        raw_retention_days=_int(general_raw, "raw_retention_days", 180),
     )
 
     ts_raw = _section(raw, "tailscale")
     tailscale = TailscaleConfig(
         enabled=_bool(ts_raw, "enabled", default=True),
+        save_raw=_bool(ts_raw, "save_raw", default=True),
         tailnet=str(ts_raw.get("tailnet") or "-"),
         api_base_url=str(ts_raw.get("api_base_url") or "https://api.tailscale.com").rstrip("/"),
         audit_overlap_seconds=_int(ts_raw, "audit_overlap_seconds", 60),
@@ -215,6 +234,7 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
         raise ConfigError(f"proton_pass.redact_mode が不正です: {redact_mode}")
     proton_pass = ProtonPassConfig(
         enabled=_bool(pp_raw, "enabled", default=True),
+        save_raw=_bool(pp_raw, "save_raw", default=True),
         cli_path=str(pp_raw.get("cli_path") or "pass-cli"),
         monitor_limit=_int(pp_raw, "monitor_limit", 200),
         agents=_str_list(pp_raw, "agents"),
@@ -225,6 +245,7 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
     ls_raw = _section(raw, "little_snitch")
     little_snitch = LittleSnitchConfig(
         enabled=_bool(ls_raw, "enabled", default=True),
+        save_raw=_bool(ls_raw, "save_raw", default=True),
         cli_path=str(ls_raw.get("cli_path") or DEFAULT_LITTLE_SNITCH_CLI),
         use_sudo=_bool(ls_raw, "use_sudo", default=True),
         overlap_seconds=_int(ls_raw, "overlap_seconds", 60),
@@ -241,6 +262,7 @@ def config_from_dict(raw: dict[str, Any]) -> Config:
     native_dir_raw = ds_raw.get("native_audit_dir")
     docker_sandbox = DockerSandboxConfig(
         enabled=_bool(ds_raw, "enabled", default=True),
+        save_raw=_bool(ds_raw, "save_raw", default=True),
         mode=mode,
         sbx_path=str(ds_raw.get("sbx_path") or "sbx"),
         native_audit_dir=Path(str(native_dir_raw)).expanduser() if native_dir_raw else None,

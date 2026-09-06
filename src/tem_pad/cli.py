@@ -123,6 +123,8 @@ def format_result(result: CollectResult) -> str:
         f"[{result.source}] fetched={result.fetched} written={result.written}"
         f" duplicates={result.duplicates}"
     )
+    if result.raw_pruned:
+        line += f" raw_pruned={result.raw_pruned}"
     if result.warnings:
         line += " warnings=" + "; ".join(result.warnings)
     return line

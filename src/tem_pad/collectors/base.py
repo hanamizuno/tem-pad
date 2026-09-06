@@ -7,7 +7,10 @@ state 保存は :func:`run_collector` が一括で行う。
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol
@@ -42,7 +45,7 @@ class CollectorContext:
         return cls(
             config=config,
             events=EventStore(config.events_dir),
-            raw=RawStore(config.raw_dir),
+            raw=RawStore(config.raw_dir, disabled_sources=config.raw_disabled_sources()),
             states=StateStore(config.state_dir),
             dry_run=dry_run,
         )
@@ -56,6 +59,7 @@ class CollectResult:
     fetched: int = 0
     written: int = 0
     duplicates: int = 0
+    raw_pruned: int = 0
     skipped: bool = False
     skip_reason: str | None = None
     warnings: list[str] = field(default_factory=_empty_str_list)
@@ -98,6 +102,31 @@ class Collector(Protocol):
         ...
 
 
+class LockBusyError(RuntimeError):
+    """同じ source の Collector が別プロセスで実行中。"""
+
+
+@contextlib.contextmanager
+def source_lock(states: StateStore, source: str) -> Generator[None]:
+    """source 単位のプロセス間ロック (``state/<source>.lock`` への flock)。
+
+    launchd の定期実行と手動実行が重なったときに、同じ state を読んで同じ
+    イベントを二重に書くのを防ぐ。取得できなければ待たずに
+    :class:`LockBusyError` を送出する。
+    """
+    lock_path = states.path_for(source).with_suffix(".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with lock_path.open("a", encoding="utf-8") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise LockBusyError(f"{source} は別プロセスが収集中です") from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def run_collector(collector: Collector, ctx: CollectorContext) -> CollectResult:
     """Collector を実行し、重複排除・書き込み・state 保存まで行う。
 
@@ -109,7 +138,23 @@ def run_collector(collector: Collector, ctx: CollectorContext) -> CollectResult:
         result.skipped = True
         result.skip_reason = "設定で無効化されています"
         return result
+    try:
+        with source_lock(ctx.states, collector.name):
+            return _run_locked(collector, ctx, result)
+    except LockBusyError as exc:
+        result.skipped = True
+        result.skip_reason = str(exc)
+        return result
+    except OSError as exc:
+        # state / JSONL の読み書き失敗も 1 source の失敗として封じ込める
+        logger.exception("collector %s storage failure", collector.name)
+        result.error = f"{type(exc).__name__}: {exc}"
+        return result
 
+
+def _run_locked(
+    collector: Collector, ctx: CollectorContext, result: CollectResult
+) -> CollectResult:
     state = ctx.states.load(collector.name)
     try:
         output = collector.collect(ctx, state)
@@ -146,4 +191,9 @@ def run_collector(collector: Collector, ctx: CollectorContext) -> CollectResult:
         new_state["seen_ids"] = seen.to_list()
         new_state["last_run"] = ctx.now.isoformat()
         ctx.states.save(collector.name, new_state)
+    result.raw_pruned = ctx.raw.prune(
+        collector.name,
+        older_than_days=ctx.config.general.raw_retention_days,
+        now=ctx.now.timestamp(),
+    )
     return result

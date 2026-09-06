@@ -69,7 +69,11 @@ Alloy 側では `stage.json` で Envelope の 5 フィールドだけを抜き�
 
 `events/`、`raw/`、`state/` のディレクトリは 0700、ファイルは 0600 で作成し、緩い権限を見つけたら書き込み時に直す (umask に依存しない)。
 
-retention は MVP では手動 (`find ~/.local/share/tem-pad/raw -mtime +180 -delete` など)。将来は NAS 等への append-only archive を追加する予定で、そのときに raw と JSONL を rsync する形を想定している。
+retention は `general.raw_retention_days` (既定 180 日) で、`collect` のたびに source ごとの古いファイルを削除する。`<source>.save_raw = false` で source 単位に保存を止められるが、証跡が残らなくなるので高頻度な source (Little Snitch など) に限るのが望ましい。将来は NAS 等への append-only archive を追加する予定で、そのときに raw と JSONL を rsync する形を想定している。
+
+## 並行実行の排他
+
+Runner は source ごとに `state/<source>.lock` へ `flock` を掛け、取れなければ待たずに skip する (`collect` の出力に「別プロセスが収集中」と出る)。launchd の定期実行と手動実行が重なったときに、同じ state から同じイベントを二重に書くのを防ぐ。
 
 ## 権限分離
 

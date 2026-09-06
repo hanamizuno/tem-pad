@@ -163,7 +163,9 @@ alloy run --storage.path=/tmp/tem-pad-sample/alloy deploy/alloy/config.alloy
 | Little Snitch | 60 秒ごと (終端は現在 - 90 秒) | 完了した 1 分区間だけを取る |
 | Docker policy log | 60 秒ごと | 前回集計との差分のみイベント化 |
 
-ログは `~/Library/Logs/tem-pad/collect.log` に出る。`tem-pad doctor` を定期的に見て NG を確認する。
+ログは `~/Library/Logs/tem-pad/collect.log` に出る。`tem-pad doctor` を定期的に見て NG を確認する。手動で `tem-pad collect` を実行して定期実行と重なった場合は、後から始まった方が `skip (… 別プロセスが収集中です)` となる。
+
+raw ログは `general.raw_retention_days` (既定 180 日) を過ぎたものが `collect` 時に削除される。
 
 ## 10. リモートから Grafana を見る (Tailscale Serve)
 

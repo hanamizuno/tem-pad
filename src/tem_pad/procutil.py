@@ -11,6 +11,8 @@ import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from tem_pad.sanitize import redact_text
+
 
 class CommandError(RuntimeError):
     """外部コマンドが失敗したときに送出する。"""
@@ -85,7 +87,8 @@ def run_command(
         returncode=completed.returncode,
     )
     if check and completed.returncode != 0:
-        preview = completed.stderr.strip().replace("\n", " ")[:stderr_preview]
+        # stderr は原因調査に必要だが、secret が混ざる可能性に備えて伏せ字化してから含める
+        preview = redact_text(completed.stderr.strip().replace("\n", " ")[:stderr_preview])
         raise CommandError(
             command,
             f"exit={completed.returncode} {preview}".strip(),

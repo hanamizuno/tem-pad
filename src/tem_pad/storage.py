@@ -10,6 +10,7 @@ import json
 import os
 import re
 import tempfile
+import time
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any, cast
@@ -170,12 +171,19 @@ class RawStore:
     渡すこと (保存前に確認するのは Collector の責務)。
     """
 
-    def __init__(self, raw_dir: Path) -> None:
-        """Args: raw_dir: raw ログのルートディレクトリ。"""
+    def __init__(self, raw_dir: Path, *, disabled_sources: Iterable[str] = ()) -> None:
+        """Args: raw_dir: raw ログのルート。disabled_sources: 保存しない source 名。"""
         self.raw_dir = raw_dir
+        self.disabled_sources = set(disabled_sources)
 
-    def write_text(self, source: str, name: str, text: str, *, ext: str = "txt") -> Path:
-        """テキストを保存し、書いたパスを返す。"""
+    def enabled_for(self, source: str) -> bool:
+        """その source の raw 保存が有効か。"""
+        return source not in self.disabled_sources
+
+    def write_text(self, source: str, name: str, text: str, *, ext: str = "txt") -> Path | None:
+        """テキストを保存し、書いたパスを返す。保存が無効な source なら None。"""
+        if not self.enabled_for(source):
+            return None
         directory = self.raw_dir / safe_name(source)
         ensure_private_dir(directory)
         stamp = format_timestamp(utc_now()).replace(":", "").replace("-", "")
@@ -187,7 +195,30 @@ class RawStore:
         atomic_write_text(path, text)
         return path
 
-    def write_json(self, source: str, name: str, data: Any) -> Path:  # noqa: ANN401
-        """JSON 化して保存する。"""
+    def write_json(self, source: str, name: str, data: Any) -> Path | None:  # noqa: ANN401
+        """JSON 化して保存する。保存が無効な source なら None。"""
         text = json.dumps(data, ensure_ascii=False, indent=1, default=str)
         return self.write_text(source, name, text, ext="json")
+
+    def prune(self, source: str, *, older_than_days: int, now: float | None = None) -> int:
+        """更新時刻が ``older_than_days`` 日より古い raw ファイルを削除し、件数を返す。
+
+        ``older_than_days`` が 0 以下なら何もしない。
+        """
+        if older_than_days <= 0:
+            return 0
+        directory = self.raw_dir / safe_name(source)
+        if not directory.is_dir():
+            return 0
+        cutoff = (now if now is not None else time.time()) - older_than_days * 86400
+        removed = 0
+        for path in directory.iterdir():
+            if not path.is_file():
+                continue
+            try:
+                if path.stat().st_mtime < cutoff:
+                    path.unlink()
+                    removed += 1
+            except OSError:
+                continue
+        return removed

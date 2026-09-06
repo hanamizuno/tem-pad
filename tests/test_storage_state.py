@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -53,6 +54,8 @@ def test_raw_store_writes_unique_files(tmp_path: Path):
     raw = RawStore(tmp_path / "raw")
     first = raw.write_json("tailscale", "audit", {"a": 1})
     second = raw.write_json("tailscale", "audit", {"a": 2})
+    assert first is not None
+    assert second is not None
     assert first != second
     assert first.parent == tmp_path / "raw" / "tailscale"
     assert json.loads(first.read_text())["a"] == 1
@@ -100,3 +103,22 @@ def test_seen_ids_is_bounded_and_ordered():
 def test_seen_ids_from_state_tolerates_bad_shape():
     assert len(SeenIds.from_state({"seen_ids": "oops"})) == 0
     assert len(SeenIds.from_state({"seen_ids": ["x", 1]})) == 2
+
+
+def test_raw_store_disabled_source_and_prune(tmp_path: Path):
+    raw = RawStore(tmp_path / "raw", disabled_sources={"little-snitch"})
+    assert raw.write_text("little-snitch", "x", "csv") is None
+    assert not (tmp_path / "raw" / "little-snitch").exists()
+
+    path = raw.write_json("tailscale", "audit", {"a": 1})
+    assert path is not None
+    old = path.parent / "old.json"
+    old.write_text("{}")
+    day = 86400
+    now = path.stat().st_mtime
+    os.utime(old, (now - 200 * day, now - 200 * day))
+    assert raw.prune("tailscale", older_than_days=180, now=now) == 1
+    assert path.exists()
+    assert not old.exists()
+    assert raw.prune("tailscale", older_than_days=0, now=now) == 0
+    assert raw.prune("missing", older_than_days=1, now=now) == 0
