@@ -1,0 +1,37 @@
+{
+  "devices": [
+    {
+      "addresses": ["100.64.0.1", "fd7a:115c:a1e0::1"],
+      "id": "1234567890",
+      "nodeId": "nQ9x8y7CNTRL",
+      "user": "alice@example.com",
+      "name": "mac-studio.tail1234.ts.net",
+      "hostname": "mac-studio",
+      "clientVersion": "1.90.0",
+      "updateAvailable": false,
+      "os": "macOS",
+      "created": "2026-01-01T00:00:00Z",
+      "lastSeen": "2026-09-06T07:59:00Z",
+      "keyExpiryDisabled": false,
+      "expires": "2027-01-01T00:00:00Z",
+      "authorized": true,
+      "isExternal": false,
+      "machineKey": "mkey:aaaa",
+      "nodeKey": "nodekey:bbbb",
+      "blocksIncomingConnections": false,
+      "tags": []
+    },
+    {
+      "addresses": ["100.64.0.2"],
+      "id": "2345678901",
+      "nodeId": "nA1b2c3CNTRL",
+      "user": "alice@example.com",
+      "name": "old-laptop.tail1234.ts.net",
+      "hostname": "old-laptop",
+      "clientVersion": "1.88.0",
+      "os": "linux",
+      "authorized": true,
+      "tags": ["tag:dev"]
+    }
+  ]
+}

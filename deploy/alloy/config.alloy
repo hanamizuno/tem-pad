@@ -1,0 +1,174 @@
+// Grafana Alloy 設定 (macOS ネイティブ実行)。
+//
+// 責務は「tem-pad が書いた正規化 JSONL を tail し、少数の label を付けて
+// Loki へ送る」ことだけ。normalize は tem-pad 側で行い、ここに business
+// logic を持ち込まない。
+//
+// 配置: deploy/alloy/config.alloy をそのまま使い、環境依存の値は
+// TEM_PAD_DATA_DIR / TEM_PAD_LOKI_URL / TEM_PAD_HOST 環境変数で差し込む
+// (docs/setup.md)。既定値は ~/.local/share/tem-pad と http://127.0.0.1:3100。
+
+// ---------------------------------------------------------------------------
+// 1. tem-pad の正規化 JSONL (events/<source>.jsonl)
+// ---------------------------------------------------------------------------
+
+local.file_match "tem_pad_events" {
+  path_targets = [{
+    __path__ = sys.env("TEM_PAD_DATA_DIR") + "/events/*.jsonl",
+    job      = "tem-pad",
+  }]
+  sync_period = "10s"
+}
+
+loki.source.file "tem_pad_events" {
+  targets    = local.file_match.tem_pad_events.targets
+  forward_to = [loki.process.tem_pad_events.receiver]
+
+  // 位置情報は Alloy の --storage.path 配下に保存されるため、Alloy 再起動後も
+  // 続きから読める。tail_from_end=false で、新規ファイルは先頭から読む。
+  tail_from_end = false
+}
+
+loki.process "tem_pad_events" {
+  forward_to = [loki.write.default.receiver]
+
+  // Envelope から label 候補だけを抜き出す。高 cardinality な値 (domain, IP,
+  // item, sandbox ID など) は payload に留めて label にしない。
+  stage.json {
+    expressions = {
+      ts       = "timestamp",
+      source   = "source",
+      kind     = "kind",
+      host     = "host",
+      decision = "decision",
+    }
+  }
+
+  stage.timestamp {
+    source = "ts"
+    format = "RFC3339Nano"
+    // timestamp が壊れていても行を捨てず、受信時刻で保存する
+    action_on_failure = "fudge"
+  }
+
+  // decision は null のイベントが多い。値があるときだけ label にする
+  // (無条件に stage.labels へ渡すと "<no value>" という label 値が付いてしまう)。
+  stage.match {
+    // match の selector は行フィルタのみ使える (| json は不可)。JSONL は空白なしで
+    // 書かれるので、"decision":"allow" のような部分文字列で判定する
+    selector = `{job="tem-pad"} |~ "\"decision\":\"(allow|deny|unknown)\""`
+    stage.labels {
+      values = {
+        decision = "",
+      }
+    }
+  }
+
+  stage.labels {
+    values = {
+      source = "",
+      kind   = "",
+      host   = "",
+    }
+  }
+
+  stage.static_labels {
+    values = {
+      schema = "tem-pad-v1",
+    }
+  }
+
+  // filename label はファイルのローテーションで増えるだけなので落とす
+  stage.label_drop {
+    values = ["filename"]
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 2. Docker Sandboxes native audit JSONL (利用できる場合のみ)
+//    完成した .jsonl だけを読む。.tmp は書き込み中なので対象にしない。
+// ---------------------------------------------------------------------------
+
+local.file_match "docker_sandbox_audit" {
+  path_targets = [{
+    __path__ = sys.env("TEM_PAD_DOCKER_AUDIT_DIR") + "/*.jsonl",
+    job      = "docker-sandbox-native",
+  }]
+  sync_period = "30s"
+}
+
+loki.source.file "docker_sandbox_audit" {
+  targets    = local.file_match.docker_sandbox_audit.targets
+  forward_to = [loki.process.docker_sandbox_audit.receiver]
+}
+
+loki.process "docker_sandbox_audit" {
+  forward_to = [loki.write.default.receiver]
+
+  // native record を tem-pad Envelope 相当の label に寄せる。
+  //   action_type -> kind, decision (AUDIT_DECISION_*) -> allow/deny
+  stage.json {
+    expressions = {
+      ts          = "timestamp",
+      action_type = "action_type",
+      decision    = "decision",
+      hostname    = "hostname",
+    }
+  }
+
+  stage.timestamp {
+    source            = "ts"
+    format            = "RFC3339Nano"
+    action_on_failure = "fudge"
+  }
+
+  stage.template {
+    source   = "decision"
+    template = "{{ if eq .Value \"AUDIT_DECISION_ALLOW\" }}allow{{ else if eq .Value \"AUDIT_DECISION_DENY\" }}deny{{ else if or (eq .Value \"<no value>\") (eq .Value \"<nil>\") (eq .Value \"\") }}{{ else }}unknown{{ end }}"
+  }
+
+  stage.template {
+    source   = "kind"
+    template = "{{ if or (eq .action_type \"<no value>\") (eq .action_type \"<nil>\") (eq .action_type \"\") }}unknown{{ else }}{{ .action_type }}{{ end }}"
+  }
+
+  stage.labels {
+    values = {
+      kind = "",
+      host = "hostname",
+    }
+  }
+
+  stage.match {
+    selector = `{job="docker-sandbox-native"} |~ "\"decision\":\"AUDIT_DECISION_(ALLOW|DENY)\""`
+    stage.labels {
+      values = {
+        decision = "",
+      }
+    }
+  }
+
+  stage.static_labels {
+    values = {
+      source = "docker-sandbox",
+      schema = "docker-audit-native",
+    }
+  }
+
+  stage.label_drop {
+    values = ["filename"]
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 3. Loki へ送信
+// ---------------------------------------------------------------------------
+
+loki.write "default" {
+  endpoint {
+    url = sys.env("TEM_PAD_LOKI_URL") + "/loki/api/v1/push"
+  }
+  external_labels = {
+    collector_host = sys.env("TEM_PAD_HOST"),
+  }
+}

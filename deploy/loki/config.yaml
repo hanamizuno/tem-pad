@@ -1,0 +1,81 @@
+# Loki single-node (monolithic) 設定。個人環境向けに小さく保つ。
+# 参考: https://github.com/grafana/loki/blob/main/cmd/loki/loki-local-config.yaml
+auth_enabled: false
+
+server:
+  # コンテナ内では全インターフェースで待ち受け、ホスト側の公開は compose で
+  # 127.0.0.1 に限定する
+  http_listen_address: 0.0.0.0
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: "2026-01-01"
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # 90 日で削除する (raw log は tem-pad 側で 180 日保持する想定)
+  retention_period: 2160h
+  # 収集は数分遅れで届くので、多少古いタイムスタンプも受け付ける
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  # label は source/host/kind/decision 程度に抑える設計なので少なめで十分
+  max_label_names_per_series: 15
+  # Collector が構造化メタデータを使わないため無効化
+  allow_structured_metadata: false
+  # 収集した JSON をパースして検索する用途なので行長は多少大きく許容する
+  max_line_size: 256KB
+  volume_enabled: true
+  # Loki が job から自動生成する service_name label は使わない (label を最小限に保つ)
+  discover_service_name: []
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 50
+  delete_request_store: filesystem
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+pattern_ingester:
+  enabled: true
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /loki/rules-temp
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true
+
+analytics:
+  reporting_enabled: false

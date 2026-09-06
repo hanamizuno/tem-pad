@@ -1,0 +1,57 @@
+# tem-pad 設定ファイルの例。~/.config/tem-pad/config.toml に置く。
+# secret の値は書かない。取得元 (env / command / file) だけを指定する。
+
+[general]
+# イベントの host フィールドに入る名前。省略時は hostname の先頭要素
+host = "mac-studio"
+data_dir = "~/.local/share/tem-pad"
+# source ごとに保持する既読 event_id の上限 (重複排除用)
+dedupe_window = 5000
+
+[tailscale]
+enabled = true
+# "-" は API 資格情報が属する tailnet
+tailnet = "-"
+audit_overlap_seconds = 60
+audit_initial_lookback_hours = 24
+devices_interval_seconds = 600
+# 既定は環境変数 TAILSCALE_OAUTH_CLIENT_ID / TAILSCALE_OAUTH_CLIENT_SECRET。
+# macOS キーチェーンから読む例:
+# oauth_client_id     = { command = ["security", "find-generic-password", "-w", "-s", "tem-pad-tailscale-client-id"] }
+# oauth_client_secret = { command = ["security", "find-generic-password", "-w", "-s", "tem-pad-tailscale-client-secret"] }
+# Proton Pass から読む例 (利用者セッションが必要):
+# oauth_client_secret = { command = ["pass-cli", "item", "view", "pass://<SHARE_ID>/<ITEM_ID>/password"] }
+# 0600 のファイルから読む例:
+# oauth_client_secret = { file = "~/.config/tem-pad/secrets/tailscale-client-secret" }
+
+[proton_pass]
+enabled = true
+cli_path = "pass-cli"
+monitor_limit = 200
+# 収集対象を絞る場合。空なら全 Agent
+agents = []
+# item / vault / reason の扱い: plain (そのまま) / hash (sha256 先頭 16 桁) / drop (保存しない)
+redact_mode = "plain"
+
+[little_snitch]
+enabled = true
+cli_path = "/Applications/Little Snitch.app/Contents/Components/littlesnitch"
+# sudoers で log-traffic だけを許可して sudo -n 経由で呼ぶ (docs/setup.md)
+use_sudo = true
+overlap_seconds = 60
+initial_lookback_minutes = 60
+
+[docker_sandbox]
+enabled = true
+# auto / native / policy-log / disabled
+mode = "auto"
+sbx_path = "sbx"
+# native audit JSONL の場所。省略時は OS 既定 (macOS: ~/Library/Logs/com.docker.sandboxes/sandboxes/auditkit)
+# native_audit_dir = "~/Library/Logs/com.docker.sandboxes/sandboxes/auditkit"
+policy_log_limit = 1000
+
+[endpoints]
+# doctor の疎通確認に使う
+loki_url = "http://127.0.0.1:3100"
+grafana_url = "http://127.0.0.1:3000"
+alloy_url = "http://127.0.0.1:12345"

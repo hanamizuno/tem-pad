@@ -1,0 +1,10 @@
+# Little Snitch の CLI (log-traffic のみ) を tem-pad の実行ユーザーが
+# パスワードなしで実行できるようにする sudoers 断片。
+#
+# 配置: sudo visudo -f /etc/sudoers.d/tem-pad  (このファイルの内容を貼り付ける)
+# __USER__ を実行ユーザー名に置き換える。
+#
+# 意図的に log-traffic サブコマンドだけに絞っている。ルール変更やモデルの
+# 書き換えが可能な他のサブコマンドを許可しないこと。パスに空白を含むため
+# バックスラッシュでエスケープしている。
+__USER__ ALL=(root) NOPASSWD: /Applications/Little\ Snitch.app/Contents/Components/littlesnitch log-traffic *

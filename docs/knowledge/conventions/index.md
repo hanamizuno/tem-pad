@@ -14,4 +14,3 @@ Repository-wide conventions. Do not restate configuration values that are alread
 
 ## Index
 
-* [sample-convention.md](sample-convention.md) — Sample. Replace with a real convention (or delete) once you have one.

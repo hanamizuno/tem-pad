@@ -1,0 +1,35 @@
+[
+  {
+    "record_id": "record_001",
+    "action": "ItemRead",
+    "vault": "agents-tem-pad",
+    "share_id": "share_xyz",
+    "item": "github-fine-grained",
+    "object_id": "item_xyz",
+    "reason": "git push from sandbox",
+    "timestamp": 1788000000
+  },
+  {
+    "record_id": "record_002",
+    "action": "ItemUpdate",
+    "vault": "agents-tem-pad",
+    "item": "deploy-key",
+    "object_id": "item_uvw",
+    "reason": "",
+    "timestamp": "2026-09-06T08:30:00Z"
+  },
+  {
+    "record_id": "record_003",
+    "action": "ItemRead",
+    "vault": "agents-tem-pad",
+    "item": "leaky-item",
+    "object_id": "item_leak",
+    "reason": "test",
+    "password": "MUST-NOT-BE-STORED",
+    "timestamp": 1788000100000
+  },
+  {
+    "vault": "agents-tem-pad",
+    "item": "no-id-no-action"
+  }
+]

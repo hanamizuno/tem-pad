@@ -1,0 +1,24 @@
+[
+  {
+    "sandbox": "claude-tem-pad",
+    "type": "network",
+    "host": "api.anthropic.com:443",
+    "proxy": "forward",
+    "rule": "domain-allowed",
+    "reason": "",
+    "last_seen": "2026-09-06T08:15:23Z",
+    "count": 42,
+    "decision": "allow"
+  },
+  {
+    "sandbox": "claude-tem-pad",
+    "type": "network",
+    "host": "blocked.example.com:443",
+    "proxy": "transparent",
+    "rule": "domain-blocked",
+    "reason": "default-deny",
+    "last_seen": "2026-09-06T08:15:25Z",
+    "count": 1,
+    "decision": "deny"
+  }
+]

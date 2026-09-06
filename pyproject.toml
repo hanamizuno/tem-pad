@@ -1,10 +1,22 @@
 [project]
-name = "python-uv-template"
+name = "tem-pad"
 version = "0.1.0"
-description = "Add your description here"
+description = "個人開発環境のセキュリティ・監査ログを収集して Loki/Grafana で横断確認するツール"
 readme = "README.md"
-requires-python = ">=3.14"
+license = "MIT"
+requires-python = ">=3.12"
+# 依存は標準ライブラリのみで完結させる (tomllib / urllib / argparse / json / csv)。
 dependencies = []
+
+[project.scripts]
+tem-pad = "tem_pad.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tem_pad"]
 
 [tool.uv]
 # Exclude packages released within the last 7 days to avoid pulling in
@@ -16,7 +28,6 @@ exclude-newer = "7 days"
 dev = [
   "pyright>=1.1.411",
   "pytest>=9.1.1",
-  "pytest-asyncio>=1.4.0",
   "pytest-cov>=7.0.0",
   "ruff>=0.15.21",
   "taskipy>=1.14.1",
@@ -24,35 +35,35 @@ dev = [
 
 [tool.taskipy.tasks]
 lint = { cmd = "task lint:ruff && task lint:pyright", help = "Run Ruff and Pyright checkers" }
-"lint:ruff" = { cmd = "ruff check .", help = "Run Ruff linter" }
+"lint:ruff" = { cmd = "ruff check . && ruff format --check .", help = "Run Ruff linter and formatter check" }
 "lint:pyright" = { cmd = "pyright", help = "Run Pyright type checker" }
 fix = { cmd = "ruff check --fix .", help = "Run Ruff linter with auto-fix" }
 format = { cmd = "ruff format .", help = "Run Ruff formatter" }
 test = { cmd = "pytest", help = "Run tests" }
-test_cov = { cmd = "pytest --cov=myapp --cov-report=html --cov-report=term", help = "Run tests with coverage report" }
+test_cov = { cmd = "pytest --cov=tem_pad --cov-report=html --cov-report=term", help = "Run tests with coverage report" }
 
 [tool.pytest.ini_options]
-# `--import-mode=importlib` is required for co-located `tests/` directories:
-# without it, same-named test files under different `tests/` collide.
 addopts = "--import-mode=importlib -ra --strict-markers"
-testpaths = ["myapp"]
+pythonpath = ["."]
+testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
-# pytest-asyncio: async tests need an explicit @pytest.mark.asyncio marker
-asyncio_mode = "strict"
 
 [tool.coverage.run]
-source = ["myapp"]
+source = ["tem_pad"]
 branch = true
-omit = ["**/tests/**"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 100
 
 [tool.ruff.lint]
 # cf. https://docs.astral.sh/ruff/rules/
 select = ["ALL"]
 ignore = [
-  # This template does not use copyright notices
+  # This project does not use copyright notices
   "CPY001",
   # Not recommended to use with formatter
   "COM812",
@@ -74,12 +85,22 @@ ignore = [
   # Choose one
   "D203", # conflict with D211
   "D213", # conflict with D212
-  # For Japanese
-  # "D415", # missing-terminal-punctuation
-]
-allowed-confusables = [
-  # For Japanese
-  # "ノ", # U+30CE, Japanese katakana letter NO
+  # 日本語 docstring では英語向けの句点・先頭大文字の規約が合わないため無効化
+  "D400",
+  "D403",
+  "D415",
+  # from __future__ import annotations を使うため TYPE_CHECKING ブロックへの移動は不要
+  "TC001",
+  "TC002",
+  "TC003",
+  # 例外メッセージを変数に切り出す規約は小規模 CLI では冗長
+  "EM101",
+  "EM102",
+  "TRY003",
+  # 未確認事項を TODO として残すことを許可する (実機確認待ち箇所を明示するため)
+  "FIX002",
+  "TD002",
+  "TD003",
 ]
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
@@ -90,14 +111,20 @@ unfixable = []
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.pylint]
+max-args = 10
+
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["D104"]  # Allow missing docstring in __init__.py
-"**/tests/**" = [
+"scripts/**" = ["INP001"]  # 単体スクリプト置き場。パッケージにしない
+"tests/**" = [
   "S101", # Allow use of assert in tests
   "PLR2004", # Allow magic value in tests
   "D", # Docstrings not required in tests
   "ANN", # Type annotations not required in tests
   "INP001", # tests/ is intentionally not a package (pytest importlib mode)
+  "S108", # /tmp 風パスをテストデータとして使う
+  "ARG", # スタブ関数の未使用引数を許可
 ]
 
 [tool.ruff.format]
@@ -108,7 +135,8 @@ docstring-code-format = true # Enable reformatting of code snippets in docstring
 # cf. https://microsoft.github.io/pyright/#/configuration
 typeCheckingMode = "strict"
 reportMissingTypeStubs = false
-pythonVersion = "3.14"
+pythonVersion = "3.12"
+include = ["src", "tests"]
 exclude = [
   ".venv/**",
 ]

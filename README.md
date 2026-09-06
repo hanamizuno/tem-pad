@@ -1,223 +1,165 @@
-# Python + uv + AI Agent Development Template
+# tem-pad
 
-This repository serves as a template for developing Python applications using the [uv](https://docs.astral.sh/uv/) package manager. It comes pre-configured with Docker, Dev Containers, GitHub Actions CI, and common development tools.
+個人開発環境 (Mac Studio 1 台) のセキュリティ・監査ログを集約し、Grafana から横断的に確認するための軽量なログ収集・観測基盤です。汎用 SIEM ではなく、「AI Agent と自分の Mac が、いつ・どこへ・何をしたか」を 1 つのタイムラインで追えることを目的にしています。
 
-## Scope
+対象 (初期):
 
-This template targets **non-distributed Python applications** (services, internal tools, scripts) — it is not intended for building distributable libraries or wheels. It provides only the **outer scaffolding** (CI, containers, security tooling); the inner application code is intentionally minimal.
+| source | 取得元 | 主なイベント |
+|---|---|---|
+| `tailscale` | Tailscale API (Configuration audit log / device 一覧) | 設定変更、device 追加・削除・変更、policy 変更、key 関連 |
+| `proton-pass` | `pass-cli agent monitor` (Token for Agents 監査ログ) | Agent による item 読み取り・更新、reason の有無 |
+| `little-snitch` | `littlesnitch log-traffic` (CSV) | Mac 上プロセスの外部通信、deny |
+| `docker-sandbox` | native audit JSONL または `sbx policy log --json` | Sandbox 内 Agent の外部通信、allow/deny |
 
-`myapp/` is a placeholder package — rename it and replace its contents with your own. Tests are co-located under each package's `tests/` directory.
+## アーキテクチャ
 
-## Features
-
-*   **Modern Python Stack:** Uses Python 3.14+ and `uv` for fast dependency management.
-*   **Containerized Development:**
-    *   **Docker & Docker Compose:** Provides consistent development and production environments using multi-stage builds (`dev`, `prod`, `devcontainer`).
-    *   **VSCode Dev Containers:** Includes a `.devcontainer/devcontainer.json` configuration that layers the AI agent toolchain (Claude Code CLI, Codex CLI, GitHub CLI, common utilities) on top of the project's Python environment via [Dev Container Features](https://containers.dev/implementors/features/) and post-create setup.
-*   **AI Agent Sandbox:** [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/) (`sbx`) kits in `.sandbox/` run agents under stronger isolation — a microVM kernel boundary, deny-by-default networking, and credentials that never enter the VM. Coexists with the Dev Container; launched from the host.
-*   **Development Tools:** Integrated with standard development tools:
-    *   [`ruff`](https://docs.astral.sh/ruff/) for linting and formatting.
-    *   [`pyright`](https://microsoft.github.io/pyright/) for static type checking.
-    *   [`pytest`](https://docs.pytest.org/) for testing (including coverage reports).
-    *   [`taskipy`](https://github.com/taskipy/taskipy) for managing project tasks.
-*   **CI/CD:** GitHub Actions workflows (`.github/workflows/`) — a consolidated `ci.yml` runs linting, type checking, and tests (with a coverage PR comment) in a single job; companion workflows cover security scanning, SBOM generation, Dockerfile/workflow linting, and labeling.
-*   **Pre-commit Hooks:** `.pre-commit-config.yaml` runs ruff, pyright, and a lockfile check at commit time via [prek](https://github.com/j178/prek) — set up automatically in the Dev Container, optional elsewhere.
-*   **Shared Knowledge Base:** `docs/knowledge/` is an [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle — a plain-Markdown knowledge base (ADRs, architecture notes, conventions, runbooks, research) that both humans and AI agents read and write. Ships as a labeled-sample skeleton; start at [`docs/knowledge/index.md`](docs/knowledge/index.md).
-
-## Security
-
-This project implements supply chain attack protections.
-cf. https://zenn.dev/dajiaji/articles/47164ff27d2123
-
-- **Lockfile Integrity**: CI uses `uv sync --locked`, which fails when `uv.lock` is missing, tampered with, or out of sync with `pyproject.toml`
-- **Minimum Privileges**: Workflows use `permissions: {}` at top level
-- **SHA Pinning**: All GitHub Actions are pinned to commit SHAs
-- **Dependabot Cooldown**: 7-day delay before accepting new package versions
-- **Resolution Cooldown**: uv's [`exclude-newer`](https://docs.astral.sh/uv/concepts/resolution/#reproducible-resolutions) is set to `7 days`, so `uv lock` never resolves to packages released within the last 7 days (kept in sync with the Dependabot cooldown)
-- **Vulnerability Scanning**: Trivy scans dependencies on dependency/Dockerfile/workflow changes and weekly — PRs fail on CRITICAL/HIGH findings; `push`/`schedule` runs upload SARIF results to the GitHub Security tab
-- **SBOM Generation**: CycloneDX SBOM generated on dependency changes
-- **Workflow Auditing**: zizmor checks for workflow security issues
-
-> [!NOTE]
-> **Using this template in a private repository?** The SARIF upload to the Security tab requires Code scanning, which is free for public repositories but needs [GitHub Code Security](https://docs.github.com/en/code-security) for private ones — without it, the upload step fails with `Resource not accessible by integration`. If you keep your repository private, edit `.github/workflows/security.yml` to always use the table + exit-code approach instead:
->
-> 1. Delete the SARIF-format "Run Trivy vulnerability scanner" step and the "Upload Trivy scan results to GitHub Security tab" step.
-> 2. Remove the `if: github.event_name == 'pull_request'` condition from the remaining table-format step.
-> 3. Remove `security-events: write` from the job's `permissions`.
->
-> Alternatively, enable GitHub Code Security on the repository to keep the Security tab integration.
-
-## Directory Structure
-
-```
-.
-├── .claude/                    # Claude Code settings (permissions.defaultMode: auto)
-├── .devcontainer/              # Dev Container config (also runs the AI agent toolchain via Features)
-│   ├── codex-config.toml       # Initial Codex CLI config copied into the persisted ~/.codex volume
-│   ├── compose.yaml            # Devcontainer compose definition (merged with git-ignored compose.local.yaml)
-│   ├── devcontainer.json
-│   ├── initialize.sh           # Host-side hook: stages host git/Claude config for the container
-│   ├── post-create.sh
-│   ├── post-start.sh
-│   └── README.md               # AI agent toolchain, auth, isolation modes, PAT setup
-├── .dockerignore
-├── .editorconfig
-├── .github/                    # GitHub-specific files
-│   ├── copilot-instructions.md # Pointer to AGENTS.md for GitHub Copilot
-│   ├── dependabot.yml          # Dependabot configuration
-│   ├── ISSUE_TEMPLATE/         # Issue forms (bug, feature, task)
-│   ├── labeler.yml             # Path-based PR labeling config (used by label_pr.yml)
-│   ├── labels.yml              # Repository label definitions (synced via the manual Sync Labels workflow)
-│   ├── PULL_REQUEST_TEMPLATE.md
-│   ├── scripts/
-│   │   └── sync-labels.sh
-│   └── workflows/              # GitHub Actions CI workflows
-│       ├── ci.yml              # Lint + type check + tests (single job)
-│       ├── label_pr.yml        # PR auto-labeling (actions/labeler)
-│       ├── labels.yml          # Label sync (manual: workflow_dispatch)
-│       ├── lint_docker.yml
-│       ├── lint_gha.yml
-│       ├── sbom.yml            # SBOM generation
-│       └── security.yml        # Vulnerability scanning
-├── .gitignore
-├── .pre-commit-config.yaml     # Pre-commit hooks (run via prek)
-├── .python-version             # Specifies Python version (primarily for uv/tooling)
-├── .sandbox/                   # Docker Sandboxes (sbx) kits — stronger agent isolation (host-side)
-│   ├── claude-auto/            # Fork kit: claude's YOLO default -> --permission-mode auto
-│   ├── codex-approve/          # Fork kit: codex's YOLO default -> --approve-for-me
-│   ├── kit/                    # Shared mixin kit (uv, Python, prek, Codex CLI, network/credential rules)
-│   └── README.md               # sbx setup and host hand-off steps
-├── .vscode/                    # VSCode-specific files
-│   └── settings.json
-├── AGENTS.md                   # Project guidelines for AI agents and humans
-├── CLAUDE.md                   # Pointer to AGENTS.md for Claude Code
-├── Dockerfile                  # Defines container images (dev, prod, devcontainer)
-├── LICENSE
-├── README.md                   # This file
-├── compose.dev.yml             # Docker Compose configuration for development
-├── compose.yml                 # Docker Compose configuration for production
-├── docs/
-│   └── knowledge/              # Shared knowledge base (OKF bundle): ADRs, conventions, runbooks, ...
-├── myapp/                      # Placeholder application package — rename and replace
-│   ├── __init__.py
-│   ├── main.py                 # Sample application code
-│   └── tests/                  # Co-located tests (no __init__.py — uses pytest importlib mode)
-│       └── main_test.py
-├── pyproject.toml              # Project metadata and tool config (uv, ruff, pyright, pytest, taskipy)
-└── uv.lock                     # Pinned versions of dependencies
+```text
+Tailscale API ──────────┐
+Proton Pass CLI ────────┤
+Little Snitch CLI ──────┤    tem-pad collect (Python, launchd で定期実行)
+sbx policy log ─────────┤       raw 保存 → normalize → dedupe
+                        ▼
+      ~/.local/share/tem-pad/events/<source>.jsonl   (共通 Envelope + payload)
+                        │  tail
+                        ▼
+                  Grafana Alloy (macOS ネイティブ)   ← Docker native audit JSONL も直接 tail
+                        │  push (source/host/kind/decision だけを label に)
+                        ▼
+                  Loki (Docker Compose, 127.0.0.1:3100, 90 日保持)
+                        │
+                        ▼
+                  Grafana (Docker Compose, 127.0.0.1:3000)
 ```
 
-## Adopting This Template
+Collector は Loki へ直接 push しません。JSONL を介した疎結合にすることで、Loki 停止中も収集を続けられ、Loki/Grafana を作り直しても raw と JSONL から復元でき、将来別のバックエンドへも移せます。詳細は [docs/architecture.md](docs/architecture.md)。
 
-After creating a repository from this template:
-
-1. Rename the `myapp/` package directory to your project's name, then update every reference to it:
-    - `pyproject.toml`: `[project] name` and `description`, `--cov=myapp` in the `test_cov` task, `testpaths` under `[tool.pytest.ini_options]`, and `source` under `[tool.coverage.run]`
-    - `myapp/tests/main_test.py`: the `from myapp.main import hello` import
-2. Fill in the `LICENSE` placeholders (`[yyyy]`, `[name of copyright owner]`) — or replace the license entirely.
-3. Replace the sample documents in `docs/knowledge/` with real project knowledge (each sample carries a "replace me" banner).
-4. If your repository is private, adjust `.github/workflows/security.yml` as described in [Security](#security) (the Security-tab upload requires GitHub Code Security on private repositories).
-5. Run the **Sync Labels** workflow once (Actions → Sync Labels → Run workflow) to create the project labels (e.g. `meta`, used by PR auto-labeling) — label sync is manual-only.
-6. Run `uv sync && uv run task lint && uv run task test` to confirm the renamed project is healthy.
-
-## Getting Started
-
-### Prerequisites
-
-*   Docker and Docker Compose
-*   VSCode with the "Dev Containers" extension
-*   uv (if not using Docker)
-
-### Setup Options
-
-#### Option 1: Using VSCode Dev Containers
-
-1.  Open this repository in VSCode.
-2.  When prompted ("Reopen in Container"), click it. VSCode will build the development container and connect to it automatically.
-3.  You can now use the integrated terminal in VSCode, which runs inside the container.
-
-#### Option 2: Using Docker Compose Manually
-
-1.  **Build the development image:**
-    ```bash
-    docker compose -f compose.dev.yml build
-    ```
-2.  **Run commands inside the container:**
-    ```bash
-    docker compose -f compose.dev.yml run --rm app <command>
-    ```
-    For example, to run tests:
-    ```bash
-    docker compose -f compose.dev.yml run --rm app task test
-    ```
-    To get an interactive shell:
-    ```bash
-    docker compose -f compose.dev.yml run --rm app bash
-    ```
-
-#### Option 3: Using uv locally (without Docker)
-1.  **Install `uv`** (if not already installed):
-    ```bash
-    # cf. https://github.com/astral-sh/uv?tab=readme-ov-file#installation
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
-2.  **Install dependencies:**
-    ```bash
-    uv sync
-    ```
-3.  **Run commands:**
-    ```bash
-    uv run <command>
-    ```
-    For example, to run tests:
-    ```bash
-    uv run task test
-    ```
-
-### Pre-commit Hooks (optional outside the Dev Container)
-
-The Dev Container registers the git pre-commit hooks automatically (see `.devcontainer/post-create.sh`). If you work outside the container, [install prek](https://github.com/j178/prek?tab=readme-ov-file#installation) and run:
+## クイックスタート
 
 ```bash
-prek install
+# 1. Collector をインストール (uv)
+uv tool install .            # または開発用に: uv sync && uv run tem-pad --help
+
+# 2. 設定ファイルを作る (secret は書かない)
+mkdir -p ~/.config/tem-pad && cp docs/config.example.toml ~/.config/tem-pad/config.toml
+
+# 3. Loki / Grafana を起動
+cp example.env .env          # GRAFANA_ADMIN_PASSWORD を書き換える
+docker compose up -d
+
+# 4. Alloy を起動 (Homebrew 例)
+brew install grafana/grafana/alloy
+TEM_PAD_DATA_DIR=$HOME/.local/share/tem-pad TEM_PAD_LOKI_URL=http://127.0.0.1:3100 \
+TEM_PAD_HOST=$(hostname -s) TEM_PAD_DOCKER_AUDIT_DIR=$HOME/Library/Logs/com.docker.sandboxes/sandboxes/auditkit \
+alloy run --storage.path=$HOME/.local/share/tem-pad/alloy deploy/alloy/config.alloy
+
+# 5. 診断して収集
+tem-pad doctor
+tem-pad collect all
+tem-pad inspect -n 20
 ```
 
-The hooks (defined in `.pre-commit-config.yaml`) run `ruff check`, `ruff format --check`, `pyright`, and `uv lock --check` on each commit.
+手順の詳細 (Tailscale OAuth client の作成、Little Snitch の権限、launchd 登録、Tailscale Serve でのリモート閲覧) は [docs/setup.md](docs/setup.md) にあります。
 
-### Available Tasks (using Taskipy)
+## CLI
 
-Run these tasks inside the development container (either via Dev Containers terminal or `docker compose run`):
+```text
+tem-pad collect {tailscale,proton-pass,little-snitch,docker-sandbox,all} [--dry-run]
+tem-pad doctor
+tem-pad inspect [-s SOURCE] [-k KIND] [-d allow|deny] [-a ACTOR] [-g TEXT] [-n N] [--json]
+tem-pad config {show,path}
+```
 
-*   `task lint`: Run linters (`ruff check` and `pyright`).
-*   `task fix`: Automatically fix linting issues with `ruff`.
-*   `task format`: Format code with `ruff format`.
-*   `task test`: Run tests with `pytest`.
-*   `task test_cov`: Run tests and generate coverage reports.
+`collect all` は 1 つの source が失敗しても他を続け、失敗があれば終了コード 1 を返します。`doctor` は credential の値を一切表示しません。
 
-Example:
+## データの置き場所
+
+既定は `~/.local/share/tem-pad/` です。
+
+```text
+~/.local/share/tem-pad/
+├── events/<source>.jsonl   # 正規化済み (Alloy が tail する)
+├── raw/<source>/           # 取得した生データ (再処理・証跡用。secret は保存しない)
+├── state/<source>.json     # 増分取得のカーソルと既読 event_id
+└── alloy/                  # Alloy の positions (--storage.path)
+```
+
+macOS の慣習では `~/Library/Application Support` ですが、次の理由で XDG 風のパスを既定にしています。
+
+- パスに空白を含まないため、Alloy の glob・launchd・sudoers の記述が単純になる。
+- Linux でも同じ既定値で動き、fixture やドキュメントを共通化できる。
+- Proton Pass CLI など一部のツールも Linux では `~/.local/share` を使っており違和感が少ない。
+
+`general.data_dir` で変更できます。監査ログには機微情報が含まれるため、ディレクトリは `chmod 700` を推奨します (`doctor` が警告します)。
+
+## ログ形式
+
+共通 Envelope + source 固有 `payload` です。
+
+```json
+{
+  "timestamp": "2026-09-06T08:00:00Z",
+  "source": "docker-sandbox",
+  "kind": "network_egress",
+  "host": "mac-studio",
+  "actor": "claude-tem-pad",
+  "action": "connect",
+  "decision": "deny",
+  "event_id": "policy-log:…",
+  "payload": {"domain": "blocked.example.com", "sandbox": "claude-tem-pad", "rule": "default-deny"}
+}
+```
+
+Loki の label は `source` / `host` / `kind` / `decision` (+ 固定の `schema`) のみで、domain・IP・item・sandbox ID などは本文 JSON に置き `| json` で検索します。フィールド定義と kind の一覧は [docs/log-schema.md](docs/log-schema.md)。
+
+Grafana Explore での例:
+
+```logql
+{source="docker-sandbox", decision="deny"} | json
+{source="docker-sandbox"} | json | payload_agent="claude" | line_format "{{.payload_domain}}"
+{source="little-snitch"} | json | payload_process=~"(?i)docker|claude"
+{source="proton-pass", kind="agent_write"} | json
+{source="tailscale", kind="device_added"} | json
+```
+
+## Docker Sandboxes の 2 方式について
+
+Docker の native audit log (JSON Lines) は **Docker AI Governance の有償プランと、組織ポリシーの強制** が前提で、個人アカウントでは生成されません。そのため個人環境では `mode = "auto"` が自動的に `policy-log` (`sbx policy log --json`) にフォールバックします。
+
+| | native audit | policy-log (fallback) |
+|---|---|---|
+| 粒度 | 接続ごと (決定 + 実行結果) | sandbox × host × 判定ごとの集計 (件数・最終時刻) |
+| Agent 名 | `agent` フィールドで確定 | sandbox 名の先頭 (`claude-xxx` → `claude`) からの推定 |
+| filesystem / tool 等 | あり | network のみ |
+| 取り込み | Alloy が JSONL を直接 tail | tem-pad が差分イベント化 (`payload.count_delta`) |
+
+`auto` で native が検出されると Collector は何もせず、Alloy 側の設定 (`TEM_PAD_DOCKER_AUDIT_DIR`) が JSONL を読みます。両方を同時に収集して重複させないためです。
+
+## セキュリティ方針
+
+- secret を設定ファイルへ書かない。環境変数・外部コマンド (`security`, `pass-cli`)・0600 ファイルから実行時に読む。
+- secret をコマンド引数に渡さない。CLI の stderr は先頭のみをエラーに含める。
+- raw 保存前に secret らしいキー (`password`, `token`, …) を取り除く。
+- Loki/Grafana は `127.0.0.1` にのみ bind。LAN へ公開しない。リモートは Tailscale Serve。
+- Docker socket やホスト全体を mount しない。
+- Little Snitch のためだけに全体を root で動かさない。sudoers で `littlesnitch log-traffic` だけを許可する。
+- `events/` `raw/` `state/` は `.gitignore` 済み。
+
+## 開発
+
 ```bash
-# Inside Dev Container terminal or after `docker compose run ... bash`
-task lint
-task test_cov
+uv sync
+uv run task lint      # ruff + pyright (strict)
+uv run task test      # pytest (外部サービスには接続しない。fixture ベース)
+uv run task test_cov
+uv run python scripts/make_sample_events.py   # fixture からサンプル JSONL を再生成
 ```
 
-## AI Agent Dev Container
+外部仕様 (Tailscale API、pass-cli、Little Snitch CLI、sbx) について、指示書の想定と現行仕様の差分や、実機で未確認の点は [docs/implementation-notes.md](docs/implementation-notes.md) にまとめています。
 
-The Dev Container also serves as the runtime for AI coding agents (Claude Code, Codex, etc.) — setup and authentication are in [`.devcontainer/README.md`](.devcontainer/README.md); the mechanics behind it (host config inheritance, isolation modes and their limits, scoped GitHub PAT, task secrets) live in [`docs/knowledge/`](docs/knowledge/index.md).
+## 非目標 (MVP)
 
-## AI Agent Sandbox (Docker Sandboxes)
+独自 SIEM、IDS/IPS、packet capture、AI による異常判定、自動遮断、WAX610/ルーター syslog、NAS archive、モバイル/独自 Web UI は作りません。syslog は将来 Alloy の `loki.source.syslog` を足すだけで済む構造を意識しています。
 
-For unattended agent runs that need stronger isolation than a Linux container —
-a microVM kernel boundary, deny-by-default networking, and secrets that never enter the VM —
-`.sandbox/` ships kits for [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/) (`sbx`).
-It coexists with the Dev Container and is launched from the host, e.g.:
+## ライセンス
 
-```bash
-sbx create --clone --kit ./.sandbox/kit claude .
-sbx exec -it -w "$PWD" claude-<dir> claude --permission-mode auto
-```
-
-`sbx` runs on the host OS and cannot be used from inside the Dev Container.
-See [`.sandbox/README.md`](.sandbox/README.md) for setup and for getting the work
-back to the host; [`docs/knowledge/runbooks/agent-sandbox-sbx.md`](docs/knowledge/runbooks/agent-sandbox-sbx.md)
-covers the mechanics (why `--clone` is mandatory, network policy, secrets, troubleshooting).
+MIT
