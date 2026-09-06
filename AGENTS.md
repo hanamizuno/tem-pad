@@ -1,0 +1,59 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+- Source: top-level package (placeholder: `myapp/`, e.g., `myapp/main.py`). Rename for your project.
+- Tests: co-located under each package's `tests/` directory with `*_test.py` files (e.g., `myapp/tests/main_test.py`). `tests/` directories intentionally have no `__init__.py` (pytest `--import-mode=importlib`).
+- Docs & shared knowledge: `docs/knowledge/` — an OKF bundle (ADRs, architecture notes, conventions, runbooks, research) that both humans and AI agents read and write. Start at `docs/knowledge/index.md`; record decisions and rationale there instead of leaving them in chat logs.
+- Tooling: `pyproject.toml` manages deps and tasks; `uv.lock` pins versions; `.pre-commit-config.yaml` defines pre-commit hooks (run via prek).
+- Containers: `Dockerfile` (multi-stage: `dev`, `prod`, `devcontainer`), `compose.dev.yml` (dev), `compose.yml` (prod). The Dev Container is Docker Compose based (`.devcontainer/compose.yaml` + `devcontainer.json`; per-user diffs go in the git-ignored `.devcontainer/compose.local.yaml`) and is also where AI agent CLIs (Claude Code, Codex, GitHub CLI) are layered in via Dev Container Features and post-create hooks; it also inherits host config — global gitignore, git identity (user.name/email), and Claude Code settings/statusline — staged by `.devcontainer/initialize.sh` and seeded by `.devcontainer/post-start.sh`. The container's `.venv` and uv cache live in named volumes so platform-specific binaries never clash with the host's. A separate set of kits for [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/) (`sbx`) lives in `.sandbox/` — a microVM with deny-by-default networking for unattended agent runs, launched from the host (see `.sandbox/README.md`).
+
+## Build, Test, and Development Commands
+- Install (local uv): `uv sync` (dev deps included).
+- Run tasks (local): `uv run task <name>` (e.g., `uv run task test`).
+- Common tasks (via Taskipy):
+  - `task lint`: Ruff + Pyright checks.
+  - `task fix`: Ruff autofix.
+  - `task format`: Ruff formatter.
+  - `task test`: Run pytest.
+  - `task test_cov`: Pytest with coverage (HTML at `htmlcov/`).
+- Dev container (VS Code): “Reopen in Container”, then run `task ...` in terminal.
+- Docker Compose (dev): `docker compose -f compose.dev.yml run --rm app task test`.
+
+### Pre-commit Hooks
+Hooks defined in `.pre-commit-config.yaml` (check-only, no auto-fix):
+- **ruff-check** / **ruff-format**: lint and format check on staged files.
+- **pyright**: whole-project type check when Python files are staged.
+- **uv-lock-check**: verifies `uv.lock` is in sync when `pyproject.toml` changes.
+
+Setup is automatic in the Dev Container (post-create). Elsewhere, [install prek](https://github.com/j178/prek?tab=readme-ov-file#installation) and run `prek install`.
+
+## Coding Style & Naming Conventions
+- Python 3.14+, 4-space indentation, type hints required (Pyright strict).
+- Lint/format: Ruff is the single source of truth (`task lint`, `task format`).
+- Docstrings: Google style (configured via Ruff/pydocstyle).
+- Naming: modules/packages `snake_case`; classes `PascalCase`; functions/vars `snake_case`.
+- Keep public APIs small; prefer pure functions and minimal side effects.
+
+## Testing Guidelines
+- Framework: Pytest with simple `assert` style.
+- Location/naming: place tests in `tests/` co-located with the source they cover, name files `*_test.py` (or `test_*.py`), tests `test_*`.
+- Do not add `__init__.py` to `tests/` directories — pytest is configured with `--import-mode=importlib` to allow same-named test files across multiple `tests/` dirs.
+- Coverage: use `task test_cov`; include edge cases and type-related tests.
+- Fast tests by default; mark slow/external I/O as separate or mock.
+
+## Commit & Pull Request Guidelines
+- Commit style: Prefer Conventional Commits when possible
+  - Examples: `feat: add greeting cli`, `fix: correct None handling`, `chore: update uv.lock`.
+- Before PR: run `task lint` and `task test` locally/inside container and fix issues (the prek pre-commit hooks catch most lint/type issues at commit time).
+- PR description: purpose, summary of changes, how to test, related issues (`Closes #123`).
+- Include screenshots or logs when changing behavior or CLI output.
+
+## Security & Configuration Tips
+- Do not commit secrets; prefer env vars and Compose overrides.
+- **Check the environment first:** if `pass-cli` is not on PATH, you are in a Docker Sandboxes (`sbx`) microVM rather than the Dev Container, and the three pass-cli bullets below do not apply. There, GitHub authentication is injected as an HTTP header by the host-side proxy and `GH_TOKEN` holds a sentinel — never try to obtain the real token value. See `.sandbox/README.md`.
+- Task secrets (API keys, tokens) come from Proton Pass via `pass-cli`, never from ambient env. Run commands that need them as `PROTON_PASS_AGENT_REASON="<why>" pass-cli run --env-file .env -- <cmd>` (`.env` holds only `pass://` references; copy from `example.env`).
+- If any `pass-cli` command fails with an auth error — or there is no active session (`pass-cli info` fails) — run `.devcontainer/pass-relogin` and retry. It restores the session (and seeds `gh auth` when missing) from a token already provisioned in the container.
+- Never read, print, or copy `~/.local/state/proton-pass-agent/pat` — you never need the token value itself; `pass-relogin` handles it.
+- Pin dependencies via `uv.lock`; update with care (`uv sync --upgrade`).
+- CI (`.github/workflows/ci.yml`) runs lint, type check, and tests in a single job; keep the pipeline green before merging.
+

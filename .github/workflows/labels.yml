@@ -1,0 +1,32 @@
+name: Sync Labels
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview changes without applying them"
+        type: boolean
+        default: false
+
+permissions: {}
+
+# Serialize manual runs so concurrent label mutations cannot race
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Sync labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: bash .github/scripts/sync-labels.sh .github/labels.yml

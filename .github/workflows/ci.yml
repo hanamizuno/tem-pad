@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      - name: "Set up Python"
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install the project
+        # --locked also fails when uv.lock is out of sync with pyproject.toml
+        run: uv sync --locked
+
+      - name: Run ruff linter
+        run: uv run task lint:ruff
+
+      - name: Run pyright type checker
+        run: uv run task lint:pyright
+
+      - name: Run tests with coverage
+        id: coverage
+        run: |
+          uv run task test_cov | tee coverage.txt
+          report=$(tr "\n" ";" < coverage.txt)
+          echo "report=${report}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload coverage report
+        # Only PRs consume the report (via the PR comment's download link)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 14
+
+      - name: Add comment to PR
+        # GITHUB_TOKEN is read-only on PRs from forks, so commenting would fail with 403
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          COVERAGE_REPORT: ${{ steps.coverage.outputs.report }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = "<!-- coverage-report -->"
+            const allLines = process.env.COVERAGE_REPORT.split(";")
+            const divider_index = allLines.findIndex(line => line.includes("coverage: platform"))
+            const reportLines = allLines.slice(divider_index + 1, -5).map(line => line.split(/\s+/)).filter(line => line.length >= 4)
+            reportLines.splice(1, 0, reportLines[0].map(() => "----"))
+            const reportTable = reportLines.map(line => `|${line.join("|")}|`).join("\n")
+
+            const runURL = `${context.payload.repository.html_url}/actions/runs/${context.runId}`
+            const downloadLink = `[Download HTML Report from Artifacts](${runURL})`
+
+            const body = [marker, downloadLink, reportTable].join("\n")
+
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            })
+            const existing = comments.find(comment => comment.body?.startsWith(marker))
+            if (existing) {
+              await github.rest.issues.updateComment({
+                comment_id: existing.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              })
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              })
+            }

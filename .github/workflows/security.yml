@@ -1,0 +1,68 @@
+name: Security Scan
+
+# push/PR runs are limited to the files Trivy actually scans; the weekly
+# schedule still covers everything else (e.g. secrets committed elsewhere).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "uv.lock"
+      - "pyproject.toml"
+      - "Dockerfile"
+      - ".github/workflows/security.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "uv.lock"
+      - "pyproject.toml"
+      - "Dockerfile"
+      - ".github/workflows/security.yml"
+  schedule:
+    - cron: "0 0 * * 1" # Every Monday at 00:00 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # PRs (notably from forks) cannot upload SARIF, so fail the check on findings instead
+      - name: Run Trivy vulnerability scanner (PR)
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+
+      - name: Run Trivy vulnerability scanner
+        if: github.event_name != 'pull_request'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      # Requires Code scanning: free on public repos; private repos need GitHub
+      # Code Security. If private, see "Security" in README.md for the alternative.
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: github.event_name != 'pull_request'
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        with:
+          sarif_file: "trivy-results.sarif"

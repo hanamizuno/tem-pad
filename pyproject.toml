@@ -1,0 +1,114 @@
+[project]
+name = "python-uv-template"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[tool.uv]
+# Exclude packages released within the last 7 days to avoid pulling in
+# brand-new (potentially compromised) releases. Keep in sync with the
+# Dependabot `cooldown.default-days` in .github/dependabot.yml.
+exclude-newer = "7 days"
+
+[dependency-groups]
+dev = [
+  "pyright>=1.1.411",
+  "pytest>=9.1.1",
+  "pytest-asyncio>=1.4.0",
+  "pytest-cov>=7.0.0",
+  "ruff>=0.15.21",
+  "taskipy>=1.14.1",
+]
+
+[tool.taskipy.tasks]
+lint = { cmd = "task lint:ruff && task lint:pyright", help = "Run Ruff and Pyright checkers" }
+"lint:ruff" = { cmd = "ruff check .", help = "Run Ruff linter" }
+"lint:pyright" = { cmd = "pyright", help = "Run Pyright type checker" }
+fix = { cmd = "ruff check --fix .", help = "Run Ruff linter with auto-fix" }
+format = { cmd = "ruff format .", help = "Run Ruff formatter" }
+test = { cmd = "pytest", help = "Run tests" }
+test_cov = { cmd = "pytest --cov=myapp --cov-report=html --cov-report=term", help = "Run tests with coverage report" }
+
+[tool.pytest.ini_options]
+# `--import-mode=importlib` is required for co-located `tests/` directories:
+# without it, same-named test files under different `tests/` collide.
+addopts = "--import-mode=importlib -ra --strict-markers"
+testpaths = ["myapp"]
+python_files = ["test_*.py", "*_test.py"]
+# pytest-asyncio: async tests need an explicit @pytest.mark.asyncio marker
+asyncio_mode = "strict"
+
+[tool.coverage.run]
+source = ["myapp"]
+branch = true
+omit = ["**/tests/**"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.ruff.lint]
+# cf. https://docs.astral.sh/ruff/rules/
+select = ["ALL"]
+ignore = [
+  # This template does not use copyright notices
+  "CPY001",
+  # Not recommended to use with formatter
+  "COM812",
+  "COM819",
+  "ISC002",
+  "Q000",
+  "Q001",
+  "Q002",
+  "Q003",
+  "Q004",
+  "E111",
+  "E114",
+  "E117",
+  "W191",
+  "D206",
+  "D207",
+  "D208",
+  "D300",
+  # Choose one
+  "D203", # conflict with D211
+  "D213", # conflict with D212
+  # For Japanese
+  # "D415", # missing-terminal-punctuation
+]
+allowed-confusables = [
+  # For Japanese
+  # "ノ", # U+30CE, Japanese katakana letter NO
+]
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["D104"]  # Allow missing docstring in __init__.py
+"**/tests/**" = [
+  "S101", # Allow use of assert in tests
+  "PLR2004", # Allow magic value in tests
+  "D", # Docstrings not required in tests
+  "ANN", # Type annotations not required in tests
+  "INP001", # tests/ is intentionally not a package (pytest importlib mode)
+]
+
+[tool.ruff.format]
+# cf. https://docs.astral.sh/ruff/settings/
+docstring-code-format = true # Enable reformatting of code snippets in docstrings.
+
+[tool.pyright]
+# cf. https://microsoft.github.io/pyright/#/configuration
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+pythonVersion = "3.14"
+exclude = [
+  ".venv/**",
+]
