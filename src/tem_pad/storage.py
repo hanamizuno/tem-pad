@@ -19,9 +19,26 @@ from tem_pad.models import Event, format_timestamp, utc_now
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 
-def atomic_write_text(path: Path, text: str, *, mode: int = 0o600) -> None:
+PRIVATE_DIR_MODE = 0o700
+PRIVATE_FILE_MODE = 0o600
+
+
+def ensure_private_dir(path: Path) -> None:
+    """ディレクトリを 0700 で作成し、既存で緩い権限なら 0700 に直す。"""
+    path.mkdir(parents=True, exist_ok=True, mode=PRIVATE_DIR_MODE)
+    if path.stat().st_mode & 0o077:
+        path.chmod(PRIVATE_DIR_MODE)
+
+
+def ensure_private_file(path: Path) -> None:
+    """既存ファイルの権限が緩ければ 0600 に直す。"""
+    if path.exists() and path.stat().st_mode & 0o077:
+        path.chmod(PRIVATE_FILE_MODE)
+
+
+def atomic_write_text(path: Path, text: str, *, mode: int = PRIVATE_FILE_MODE) -> None:
     """一時ファイルへ書いてから rename することで途中状態を残さない。"""
-    path.parent.mkdir(parents=True, exist_ok=True)
+    ensure_private_dir(path.parent)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     tmp_path = Path(tmp_name)
     try:
@@ -66,8 +83,11 @@ class EventStore:
         for source, items in by_source.items():
             items.sort(key=lambda item: item.timestamp)
             path = self.path_for(source)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("a", encoding="utf-8") as handle:
+            ensure_private_dir(path.parent)
+            ensure_private_file(path)
+            # 監査ログは機微なので、新規ファイルは必ず 0600 で作る (umask に依存しない)
+            fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, PRIVATE_FILE_MODE)
+            with os.fdopen(fd, "a", encoding="utf-8") as handle:
                 for event in items:
                     handle.write(event.to_json())
                     handle.write("\n")
@@ -75,6 +95,27 @@ class EventStore:
                 handle.flush()
                 os.fsync(handle.fileno())
         return written
+
+    def recent_event_ids(self, source: str, limit: int) -> list[str]:
+        """JSONL 末尾 ``limit`` 行に含まれる event_id を古い順に返す。
+
+        state 保存前にプロセスが落ちた場合でも、書き終えたイベントの ID を
+        ここから復元して重複排除に使う。
+        """
+        path = self.path_for(source)
+        if limit <= 0 or not path.exists():
+            return []
+        ids: list[str] = []
+        for line in _tail_lines(path, limit):
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(data, dict):
+                event_id = cast("dict[str, Any]", data).get("event_id")
+                if isinstance(event_id, str) and event_id:
+                    ids.append(event_id)
+        return ids
 
     def iter_events(self, source: str) -> Iterator[Event]:
         """JSONL を先頭から読む。壊れた行は読み飛ばす。"""
@@ -103,6 +144,25 @@ class EventStore:
         return sorted(path.stem for path in self.events_dir.glob("*.jsonl"))
 
 
+def _tail_lines(path: Path, limit: int, *, block_size: int = 64 * 1024) -> list[str]:
+    """ファイル末尾から最大 ``limit`` 行を読む (先頭の行から順に返す)。"""
+    with path.open("rb") as handle:
+        handle.seek(0, os.SEEK_END)
+        position = handle.tell()
+        chunks: list[bytes] = []
+        newlines = 0
+        while position > 0 and newlines <= limit:
+            read_size = min(block_size, position)
+            position -= read_size
+            handle.seek(position)
+            chunk = handle.read(read_size)
+            chunks.append(chunk)
+            newlines += chunk.count(b"\n")
+        data = b"".join(reversed(chunks))
+    lines = data.decode("utf-8", errors="replace").splitlines()
+    return [line for line in lines if line.strip()][-limit:]
+
+
 class RawStore:
     """取得した生データを ``raw/<source>/<timestamp>-<name>.<ext>`` に保存する。
 
@@ -117,7 +177,7 @@ class RawStore:
     def write_text(self, source: str, name: str, text: str, *, ext: str = "txt") -> Path:
         """テキストを保存し、書いたパスを返す。"""
         directory = self.raw_dir / safe_name(source)
-        directory.mkdir(parents=True, exist_ok=True)
+        ensure_private_dir(directory)
         stamp = format_timestamp(utc_now()).replace(":", "").replace("-", "")
         path = directory / f"{stamp}-{safe_name(name)}.{ext}"
         counter = 1

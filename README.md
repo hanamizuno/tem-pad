@@ -138,7 +138,8 @@ Docker の native audit log (JSON Lines) は **Docker AI Governance の有償プ
 
 - secret を設定ファイルへ書かない。環境変数・外部コマンド (`security`, `pass-cli`)・0600 ファイルから実行時に読む。
 - secret をコマンド引数に渡さない。CLI の stderr は先頭のみをエラーに含める。
-- raw 保存前に secret らしいキー (`password`, `token`, …) を取り除く。
+- イベント・raw の保存前に共通 sanitizer を通し、secret らしいキー (`password`, `token`, …) を削除し、既知の secret 形式 (`tskey-…`, `pst_…`) を伏せ字にする。
+- `events/` `raw/` `state/` は 0700 / 0600 で作成する。
 - Loki/Grafana は `127.0.0.1` にのみ bind。LAN へ公開しない。リモートは Tailscale Serve。
 - Docker socket やホスト全体を mount しない。
 - Little Snitch のためだけに全体を root で動かさない。sudoers で `littlesnitch log-traffic` だけを許可する。

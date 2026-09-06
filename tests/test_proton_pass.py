@@ -165,3 +165,32 @@ def test_collector_list_failure(ctx: CollectorContext, monkeypatch: pytest.Monke
     result = run_collector(ProtonPassCollector(), ctx)
     assert not result.ok
     assert "not logged in" in (result.error or "")
+
+
+def test_monitor_limit_reached_warns(
+    ctx: CollectorContext, config: Config, monkeypatch: pytest.MonkeyPatch
+):
+    config.proton_pass.monitor_limit = 4  # fixture は 4 件なので上限到達
+    agents = json.dumps(load_fixture("proton_pass", "agent_list.json"))
+    monitor = json.dumps(load_fixture("proton_pass", "agent_monitor.json"))
+    fake, _calls = _stub_run_command({"agent list": agents, "agent monitor": monitor})
+    monkeypatch.setattr("tem_pad.collectors.proton_pass.run_command", fake)
+    result = run_collector(ProtonPassCollector(), ctx)
+    assert result.ok
+    assert any("monitor_limit" in w for w in result.warnings)
+    state = ctx.states.load("proton-pass")
+    assert state["agents"]["claude-dev"]["limit_reached"] is True
+
+
+def test_token_like_values_are_redacted_in_events(now: datetime):
+    cfg = ProtonPassConfig()
+    record = {
+        "record_id": "r1",
+        "action": "ItemRead",
+        "vault": "V",
+        "item": "I",
+        "reason": "login with pst_abcdefgh1234::KEY",
+    }
+    event = normalize_record({"name": "a", "id": None}, record, host="h", now=now, cfg=cfg)
+    assert "abcdefgh1234" not in event.to_json()
+    assert event.payload["reason"] == "login with pst_<redacted>"

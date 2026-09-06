@@ -41,8 +41,9 @@ class Collector(Protocol):
 ```
 
 - `collect()` は `Event` のリストと、保存したい新しい `state` を返す。失敗時は例外を投げ、Runner が捕まえて `state` を進めない (次回同じ区間を取り直す)。
-- 重複排除は Runner が `event_id` で行う。`event_id` が `None` のイベント (device 差分など) は排除しない。
+- 重複排除は Runner が `event_id` で行う。すべての Collector が決定的な `event_id` を付ける (device 差分も `device:<nodeId>:<kind>:<差分のハッシュ>`)。
 - 既読 ID は `state["seen_ids"]` に有界リスト (既定 5000 件) で保存する。overlap window で再取得した分はここで落ちる。
+- **クラッシュ耐性**: JSONL への append と state 保存は別操作なので、その間で落ちると state は古いまま残る。Runner は毎回 JSONL の末尾 (既定 5000 行) から `event_id` を読み直して既読集合に加えるため、古い state から同じイベントを再計算しても重複して書かない。
 
 ## 増分取得と overlap
 
@@ -64,7 +65,9 @@ Alloy 側では `stage.json` で Envelope の 5 フィールドだけを抜き�
 
 ## raw log
 
-`raw/<source>/<UTC 時刻>-<名前>.json|csv` に、取得したレスポンスをそのまま保存する。例外は secret の混入が疑われる場合で、Proton Pass では `password` / `token` などのキーを保存前に落とす。
+`raw/<source>/<UTC 時刻>-<名前>.json|csv` に、取得したレスポンスを保存する。保存前に共通 sanitizer (`sanitize.py`) を通し、`password` / `token` / `secret` などのキーを削除し、既知の secret 形式 (`tskey-…`, `pst_…::…`, `Bearer …`) に一致する値を伏せ字にする。監査ログに secret が含まれない想定でも、API の仕様変更や誤設定に備えた防御層として全 source に適用する。
+
+`events/`、`raw/`、`state/` のディレクトリは 0700、ファイルは 0600 で作成し、緩い権限を見つけたら書き込み時に直す (umask に依存しない)。
 
 retention は MVP では手動 (`find ~/.local/share/tem-pad/raw -mtime +180 -delete` など)。将来は NAS 等への append-only archive を追加する予定で、そのときに raw と JSONL を rsync する形を想定している。
 

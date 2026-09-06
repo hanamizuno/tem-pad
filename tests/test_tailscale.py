@@ -64,6 +64,10 @@ def test_diff_devices(now: datetime):
     changed = by_kind["device_changed"]
     assert set(changed.payload["changes"]) == {"keyExpiryDisabled"}
     assert by_kind["device_removed"].payload["hostname"] == "old-laptop"
+    # 差分イベントの ID は決定的で、同じ差分からは同じ ID が出る
+    again = diff_devices(before, after, host="mac-studio", now=now + timedelta(hours=1))
+    assert sorted(e.event_id or "" for e in again) == sorted(e.event_id or "" for e in events)
+    assert all(e.event_id and e.event_id.startswith("device:") for e in events)
 
 
 def test_diff_devices_ignores_volatile_fields(now: datetime):
@@ -201,3 +205,52 @@ def test_client_oauth_exchange(config: Config, monkeypatch: pytest.MonkeyPatch):
     assert "fields=all" in seen[1]["url"]
     # トークンはリクエストのヘッダ以外 (URL 等) に現れない
     assert "csecret" not in seen[1]["url"]
+
+
+def test_audit_entry_secret_values_are_redacted(now: datetime):
+    entry = {
+        "eventGroupID": "g",
+        "actor": {"loginName": "alice@example.com"},
+        "target": {"type": "AUTH_KEY", "name": "key"},
+        "action": "CREATE",
+        "old": "",
+        "new": "tskey-auth-kSECRET123456-abcdef",
+        "eventTime": "2026-09-06T08:00:00Z",
+        "clientSecret": "must-not-appear",
+    }
+    event = normalize_audit_entry(entry, "h", now)
+    text = event.to_json()
+    assert "kSECRET123456" not in text
+    assert "must-not-appear" not in text
+    assert event.payload["new"] == "tskey-<redacted>"
+
+
+def test_crash_between_append_and_state_save_does_not_duplicate(
+    ctx: CollectorContext, config: Config, monkeypatch: pytest.MonkeyPatch
+):
+    logs = load_fixture("tailscale", "audit_logs.json")["logs"]
+    before = load_fixture("tailscale", "devices_before.json")["devices"]
+    after = load_fixture("tailscale", "devices_after.json")["devices"]
+    stub = _StubClient(logs, before)
+
+    def factory(_config: Config) -> _StubClient:
+        return stub
+
+    monkeypatch.setattr("tem_pad.collectors.tailscale.TailscaleClient", factory)
+    collector = TailscaleCollector()
+    run_collector(collector, ctx)
+    saved_state = ctx.states.load("tailscale")
+
+    # 2 回目: device 差分が出るが、state 保存に失敗したとみなして state を巻き戻す
+    ctx.now = ctx.now + timedelta(minutes=15)
+    stub.devices_data = after
+    second = run_collector(collector, ctx)
+    assert second.written == 3
+    ctx.states.save("tailscale", saved_state)
+
+    # 3 回目 (同じ差分の再計算): JSONL 末尾の ID から既読を復元し、何も書かない
+    third = run_collector(collector, ctx)
+    assert third.written == 0
+    assert third.duplicates == 3 + 4
+    lines = (config.events_dir / "tailscale.jsonl").read_text().splitlines()
+    assert len(lines) == 4 + 3

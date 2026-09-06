@@ -38,11 +38,13 @@
 | Agent 一覧 | `pass-cli agent list --output json` | 同じ。human 出力は `- [pat_abc123]: my-agent (expires: ...)`。JSON のキー名はドキュメントに記載なし | `name`/`agent_name`/`title`、`id`/`pat_id` など候補キーを順に探す |
 | 監査ログ | `pass-cli agent monitor <agent> --limit ... --output json` | 同じ。利用者セッションでは `<NAME>` 必須、Agent 自身のセッションでは省略可。既定 limit 100。human 出力は `[record_001] action=ItemRead vault="..." item="..." reason="..." (object_id=item_xyz)` | `record_id`/`id`、`action`、`vault`/`share_id`、`item`/`object_id`、`reason`、時刻は epoch (秒/ミリ秒) と ISO の両対応 |
 | 監査対象操作 | - | `item view/create/update/trash/untrash/move`, `vault update` が reason 必須 | 変更系を `agent_write` に分類 |
+| 取得位置 | Agent ごとの前回位置を state に保存 | `agent monitor` は直近 `--limit` 件を返すのみで、cursor / since / ページングはドキュメント上存在しない | 毎回直近 N 件を取得して `event_id` で重複排除。N 件に達した場合は取りこぼしの可能性として warning を出し、state に `limit_reached` を記録する。CLI にページングが追加されたら `last_record_id` まで遡る実装に変える |
 | セッション | - | Agent/PAT セッションは 2 時間で失効、session lock 不可。セッション保存先 macOS: `~/Library/Application Support/proton-pass-cli/.session/` | doctor で `pass-cli info` を確認 |
 | 注意 | - | 2.2.1 で「agent audit log を誤った形式で保存する」バグ修正あり | 2.2.1 以降を前提 |
 
 ### 実機で確認すること
 
+- `agent monitor` に `--since` / cursor / ページングに相当するオプションが増えていないか (`pass-cli agent monitor --help`)。
 - `agent list` / `agent monitor` の JSON キー名。確認後に候補キーを絞り、fixture を実出力ベースに置き換える。
 - `--output json` の出力に人間向けの行が混ざるか (混ざる場合も `parse_json_output` が最初の JSON を拾う)。
 

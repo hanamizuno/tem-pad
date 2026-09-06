@@ -29,6 +29,7 @@ from tem_pad.collectors.base import CollectorContext, CollectOutput
 from tem_pad.config import Config, TailscaleConfig
 from tem_pad.httputil import HttpError, form_encode, request
 from tem_pad.models import KIND_UNKNOWN, Event, format_timestamp, parse_timestamp
+from tem_pad.sanitize import sanitize, sanitize_dict
 from tem_pad.secrets import SecretError
 
 SOURCE = "tailscale"
@@ -201,7 +202,12 @@ def _entry_time(entry: dict[str, Any], fallback: datetime) -> datetime:
 
 
 def normalize_audit_entry(entry: dict[str, Any], host: str, fallback_time: datetime) -> Event:
-    """監査ログ 1 エントリを Event にする。未知フィールドは payload に残す。"""
+    """監査ログ 1 エントリを Event にする。未知フィールドは payload に残す。
+
+    ``old`` / ``new`` / 未知フィールドには任意の値が入り得るため、保存前に
+    secret らしいキーの削除と既知 secret 形式の伏せ字化を行う。
+    """
+    entry = sanitize_dict(entry)
     actor = as_str_dict(entry.get("actor"))
     target = as_str_dict(entry.get("target"))
     actor_name = actor.get("loginName") or actor.get("displayName") or actor.get("id")
@@ -284,6 +290,17 @@ def _normalize_value(value: Any) -> Any:  # noqa: ANN401
     return value
 
 
+def device_event_id(kind: str, node_id: str, content: dict[str, Any]) -> str:
+    """device 差分イベントの決定的な ID。
+
+    同じスナップショット差分から同じ ID が出るので、state 保存前にプロセスが
+    落ちて同じ差分を再計算しても重複排除できる。
+    """
+    canonical = json.dumps(content, sort_keys=True, ensure_ascii=False, default=str)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]
+    return f"device:{node_id}:{kind}:{digest}"
+
+
 def _device_event(
     kind: str,
     node_id: str,
@@ -293,6 +310,7 @@ def _device_event(
     *,
     changes: dict[str, dict[str, Any]] | None,
 ) -> Event:
+    device = sanitize_dict(device)
     payload: dict[str, Any] = {
         "node_id": node_id,
         "device_name": device.get("name"),
@@ -306,7 +324,7 @@ def _device_event(
         "is_ephemeral": device.get("isEphemeral"),
     }
     if changes is not None:
-        payload["changes"] = changes
+        payload["changes"] = sanitize_dict(changes)
     return Event(
         timestamp=now,
         source=SOURCE,
@@ -315,7 +333,7 @@ def _device_event(
         actor=str(device.get("user")) if device.get("user") else None,
         action=kind.split("_", 1)[1],
         decision=None,
-        event_id=None,
+        event_id=device_event_id(kind, node_id, changes if changes is not None else device),
         payload=payload,
     )
 
@@ -345,7 +363,9 @@ class TailscaleCollector:
 
         # --- Configuration audit log ---
         start = _audit_window_start(state, ctx.now, cfg)
-        entries = client.configuration_audit_logs(start, ctx.now)
+        entries = [
+            sanitize_dict(entry) for entry in client.configuration_audit_logs(start, ctx.now)
+        ]
         if not ctx.dry_run:
             ctx.raw.write_json(
                 SOURCE,
@@ -369,14 +389,14 @@ class TailscaleCollector:
                         kind=KIND_UNKNOWN,
                         host=host,
                         event_id=audit_event_id(entry),
-                        payload={"raw": entry},
+                        payload={"raw": sanitize(entry)},
                     )
                 )
         new_state["audit_cursor"] = format_timestamp(ctx.now)
 
         # --- Devices ---
         if _devices_due(state, ctx.now, cfg.devices_interval_seconds):
-            devices = client.devices()
+            devices = [sanitize_dict(device) for device in client.devices()]
             if not ctx.dry_run:
                 ctx.raw.write_json(SOURCE, "devices", {"devices": devices})
             current = device_snapshot(devices)

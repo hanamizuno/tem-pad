@@ -26,6 +26,7 @@ from tem_pad.collectors.base import CollectorContext, CollectOutput
 from tem_pad.config import Config, LittleSnitchConfig
 from tem_pad.models import DECISION_ALLOW, DECISION_DENY, Event, parse_timestamp
 from tem_pad.procutil import CommandError, run_command, which
+from tem_pad.sanitize import redact_text
 
 SOURCE = "little-snitch"
 
@@ -208,9 +209,10 @@ class LittleSnitchCollector:
             )
         command = build_command(cfg, begin, end)
         result = run_command(command, timeout=cfg.timeout_seconds)
+        csv_text = redact_text(result.stdout)
         if not ctx.dry_run:
-            ctx.raw.write_text(SOURCE, "log-traffic", result.stdout, ext="csv")
-        rows = parse_csv(result.stdout)
+            ctx.raw.write_text(SOURCE, "log-traffic", csv_text, ext="csv")
+        rows = parse_csv(csv_text)
         events: list[Event] = []
         warnings: list[str] = []
         for row in rows:

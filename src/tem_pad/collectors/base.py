@@ -126,6 +126,9 @@ def run_collector(collector: Collector, ctx: CollectorContext) -> CollectResult:
         return result
 
     seen = SeenIds.from_state(state, limit=ctx.config.general.dedupe_window)
+    # 前回 append 後・state 保存前に落ちた場合に備え、JSONL 末尾の ID も既読に加える
+    for event_id in ctx.events.recent_event_ids(collector.name, ctx.config.general.dedupe_window):
+        seen.add(event_id)
     fresh: list[Event] = []
     for event in output.events:
         if event.event_id is not None and not seen.add(event.event_id):

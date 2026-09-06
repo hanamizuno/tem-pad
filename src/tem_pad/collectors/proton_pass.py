@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -26,13 +25,9 @@ from tem_pad.collectors.base import CollectorContext, CollectOutput
 from tem_pad.config import Config, ProtonPassConfig
 from tem_pad.models import KIND_UNKNOWN, Event, parse_timestamp
 from tem_pad.procutil import CommandError, run_command, which
+from tem_pad.sanitize import sanitize
 
 SOURCE = "proton-pass"
-
-# 値が secret である可能性が高いキー。監査記録には無い想定だが防御的に除外する
-_SECRET_KEY = re.compile(
-    r"(password|secret|token|totp|private|credential|passphrase)", re.IGNORECASE
-)
 
 _AGENT_NAME_KEYS = ("name", "agent_name", "agentName", "title", "label")
 _AGENT_ID_KEYS = ("id", "pat_id", "patId", "personal_access_token_id", "agent_id", "token_id")
@@ -89,16 +84,8 @@ def first(record: dict[str, Any], keys: tuple[str, ...]) -> Any:  # noqa: ANN401
 
 
 def strip_secret_keys(data: Any) -> Any:  # noqa: ANN401
-    """secret らしいキーを再帰的に取り除く。"""
-    if isinstance(data, dict):
-        return {
-            str(key): strip_secret_keys(value)
-            for key, value in cast("dict[Any, Any]", data).items()
-            if not _SECRET_KEY.search(str(key))
-        }
-    if isinstance(data, list):
-        return [strip_secret_keys(item) for item in cast("list[Any]", data)]
-    return data
+    """secret らしいキーの削除と既知 secret 形式の伏せ字化 (共通 sanitizer)。"""
+    return sanitize(data)
 
 
 def parse_json_output(text: str) -> Any:  # noqa: ANN401
@@ -306,6 +293,14 @@ class ProtonPassCollector:
                 continue
             if not ctx.dry_run:
                 ctx.raw.write_json(SOURCE, f"monitor-{name}", strip_secret_keys(records))
+            limit_reached = len(records) >= cfg.monitor_limit
+            if limit_reached:
+                # 直近 N 件しか取れないため、実行間に N 件以上の記録があると取りこぼす
+                warnings.append(
+                    f"agent {name!r} の monitor が monitor_limit ({cfg.monitor_limit}) 件に"
+                    "達しました。取りこぼしの可能性があるため monitor_limit を増やすか"
+                    "実行間隔を短くしてください"
+                )
             latest_id: str | None = None
             for record in records:
                 try:
@@ -323,6 +318,7 @@ class ProtonPassCollector:
                 "id": agent.get("id"),
                 "last_record_id": latest_id,
                 "records_seen": len(records),
+                "limit_reached": limit_reached,
             }
         new_state = dict(state)
         new_state["agents"] = per_agent

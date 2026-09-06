@@ -38,6 +38,7 @@ from tem_pad.models import (
     parse_timestamp,
 )
 from tem_pad.procutil import CommandError, run_command, which
+from tem_pad.sanitize import sanitize
 
 SOURCE = "docker-sandbox"
 
@@ -293,6 +294,7 @@ class DockerSandboxCollector:
                 data = json.loads(result.stdout)
         except json.JSONDecodeError as exc:
             raise ValueError("sbx policy log --json の出力を JSON として解釈できません") from exc
+        data = sanitize(data)
         if not ctx.dry_run:
             ctx.raw.write_json(SOURCE, "policy-log", data)
         rows = parse_policy_log(data)

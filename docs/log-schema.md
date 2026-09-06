@@ -13,7 +13,7 @@
 | `actor` | string \| null | 行為者 (ユーザー、Agent、プロセス名、sandbox 名) | no |
 | `action` | string \| null | 行為 (`connect`, `ItemRead`, `UPDATE`, `added` など) | no |
 | `decision` | `allow` \| `deny` \| `unknown` \| null | 判定。判定を持たないイベントは null | yes (null なら付けない) |
-| `event_id` | string \| null | source 内で一意な ID。重複排除に使う。差分イベントは null | no |
+| `event_id` | string \| null | source 内で一意で決定的な ID。重複排除に使う (device 差分は `device:<nodeId>:<kind>:<hash>`) | no |
 | `payload` | object | source 固有。以下参照 | no |
 
 Alloy は固定 label `schema="tem-pad-v1"` を付ける。Docker native audit を直接 tail した行には `schema="docker-audit-native"`, `source="docker-sandbox"` を付け、`action_type` を `kind` に、`AUDIT_DECISION_*` を `allow`/`deny` に写す。
