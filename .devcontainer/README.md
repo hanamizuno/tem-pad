@@ -1,6 +1,6 @@
 # AI Agent Dev Container
 
-The Dev Container also serves as the runtime for AI coding agents (Claude Code, Codex, etc.). It is Docker Compose based: `./compose.yaml` defines the container, `devcontainer.json` layers the agent toolchain on top via [Dev Container Features](https://containers.dev/implementors/features/) and post-create setup, and the git-ignored `./compose.local.yaml` carries per-user overrides (see below). (`./compose.yaml` is devcontainer-only; the root `compose.yml` / `compose.dev.yml` are separate.)
+The Dev Container also serves as the runtime for AI coding agents (Claude Code, Codex, etc.). It is Docker Compose based: `./compose.yaml` defines the container, `devcontainer.json` layers the agent toolchain on top via [Dev Container Features](https://containers.dev/implementors/features/) and post-create setup, and the git-ignored `./compose.local.yaml` carries per-user overrides (see below). (`./compose.yaml` is devcontainer-only; the root `compose.yaml` is tem-pad's Loki/Grafana stack and is separate. The container image is built from the `devcontainer` target of the root `Dockerfile`.)
 
 For the mechanics and security model behind this container — host config inheritance, isolation modes and their limits, `.venv`/uv-cache isolation — see [`docs/knowledge/architecture/devcontainer-agent-runtime.md`](/docs/knowledge/architecture/devcontainer-agent-runtime.md).
 

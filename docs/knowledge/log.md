@@ -30,3 +30,4 @@ heading (`## YYYY-MM-DD`). Keep each bullet terse and link to the concrete file.
 ## 2026-09-06
 
 * tem-pad の初期実装 (Phase 1〜7)。ADR-0003 (JSONL 経由の疎結合パイプライン)、ADR-0004 (src レイアウト) を追加し、テンプレートのサンプル文書を削除。
+* ルートの `Dockerfile` / `.dockerignore` を復元。初期実装で不要と判断して削除したが、Dev Container が `devcontainer` ターゲットをビルドに使っており、Lint Docker (hadolint) も対象ファイルなしで失敗していた。
