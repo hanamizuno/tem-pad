@@ -1,14 +1,14 @@
 """tests/fixtures から正規化済みのサンプル JSONL を生成する。
 
-Phase 2 の end-to-end 確認 (sample JSONL -> Alloy -> Loki -> Grafana) と、
-利用者が自分の Alloy/Loki 設定を検証する用途に使う。実データは含まない。
+Phase 2 の end-to-end 確認 (sample JSONL -> Alloy -> Loki -> Grafana) や、
+利用者が手元の Alloy/Loki 設定を検証するのに使う。実データは含まない。
 
 使い方::
 
     uv run python scripts/make_sample_events.py [出力ディレクトリ] [--now]
 
-出力先の既定は deploy/sample/events/。--now を付けると timestamp を
-現在時刻付近にずらし、Loki の reject_old_samples に弾かれないようにする。
+出力先の既定は deploy/sample/events/。--now を付けると timestamp を現在時刻付近へずらし、
+Loki の reject_old_samples で弾かれないようにする。
 """
 
 from __future__ import annotations
@@ -82,8 +82,8 @@ def main(argv: list[str]) -> int:
     now = datetime.now(tz=UTC)
     events = build_events(now)
     if shift_to_now:
-        # fixture の時刻は数日に散っているので、順序を保ったまま直近 30 分に詰め直す
-        # (Loki の reject_old_samples / too-new 判定に掛からないようにする)
+        # fixture の時刻は数日に散らばっているため、順序を保ったまま直近 30 分に詰める
+        # (Loki の reject_old_samples や too-new 判定を避ける)
         ordered = sorted(events, key=lambda e: e.timestamp)
         step = timedelta(minutes=30) / max(len(ordered), 1)
         for index, event in enumerate(ordered):

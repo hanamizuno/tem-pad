@@ -31,7 +31,7 @@ sbx policy log ─────────┤       raw 保存 → normalize →
                   Grafana (Docker Compose, 127.0.0.1:3000)
 ```
 
-Collector は Loki へ直接 push しません。JSONL を介した疎結合にすることで、Loki 停止中も収集を続けられ、Loki/Grafana を作り直しても raw と JSONL から復元でき、将来別のバックエンドへも移せます。詳細は [docs/architecture.md](docs/architecture.md)。
+Collector は Loki へ直接 push せず、JSONL を介して疎結合にしています。これにより、Loki が止まっていても収集を続けられ、Loki/Grafana を作り直しても raw と JSONL から復元でき、将来は別のバックエンドにも移せます。詳しくは [docs/architecture.md](docs/architecture.md) を参照してください。
 
 ## クイックスタート
 
@@ -69,7 +69,7 @@ tem-pad inspect [-s SOURCE] [-k KIND] [-d allow|deny] [-a ACTOR] [-g TEXT] [-n N
 tem-pad config {show,path}
 ```
 
-`collect all` は 1 つの source が失敗しても他を続け、失敗があれば終了コード 1 を返します。`doctor` は credential の値を一切表示しません。
+`collect all` は 1 つの source が失敗しても残りの収集を続け、失敗が 1 つでもあれば終了コード 1 を返します。`doctor` は credential の値を一切表示しません。
 
 ## データの置き場所
 
@@ -93,7 +93,7 @@ macOS の慣習では `~/Library/Application Support` ですが、次の理由�
 
 ## ログ形式
 
-共通 Envelope + source 固有 `payload` です。
+共通の Envelope に、source 固有の `payload` を持たせた形式です。
 
 ```json
 {
@@ -109,7 +109,7 @@ macOS の慣習では `~/Library/Application Support` ですが、次の理由�
 }
 ```
 
-Loki の label は `source` / `host` / `kind` / `decision` (+ 固定の `schema`) のみで、domain・IP・item・sandbox ID などは本文 JSON に置き `| json` で検索します。フィールド定義と kind の一覧は [docs/log-schema.md](docs/log-schema.md)。
+Loki の label は `source` / `host` / `kind` / `decision` (+ 固定の `schema`) だけです。domain・IP・item・sandbox ID などは本文の JSON に入れ、`| json` で検索します。フィールド定義と kind の一覧は [docs/log-schema.md](docs/log-schema.md) を参照してください。
 
 Grafana Explore での例:
 
@@ -123,27 +123,28 @@ Grafana Explore での例:
 
 ## Docker Sandboxes の 2 方式について
 
-Docker の native audit log (JSON Lines) は **Docker AI Governance の有償プランと、組織ポリシーの強制** が前提で、個人アカウントでは生成されません。そのため個人環境では `mode = "auto"` が自動的に `policy-log` (`sbx policy log --json`) にフォールバックします。
+Docker の native audit log (JSON Lines) は **Docker AI Governance の有償プランと組織ポリシーの強制適用** が前提で、個人アカウントでは生成されません。そのため個人環境では、`mode = "auto"` のとき自動的に `policy-log` (`sbx policy log --json`) にフォールバックします。
 
 | | native audit | policy-log (fallback) |
 |---|---|---|
-| 粒度 | 接続ごと (決定 + 実行結果) | sandbox × host × 判定ごとの集計 (件数・最終時刻) |
-| Agent 名 | `agent` フィールドで確定 | sandbox 名の先頭 (`claude-xxx` → `claude`) からの推定 |
-| filesystem / tool 等 | あり | network のみ |
-| 取り込み | Alloy が JSONL を直接 tail | tem-pad が差分イベント化 (`payload.count_delta`) |
+| 粒度 | 接続ごと (判定 + 実行結果) | sandbox・host・判定ごとの集計 (件数・最終時刻) |
+| Agent 名 | `agent` フィールドで確定 | sandbox 名の先頭 (`claude-xxx` → `claude`) から推定 |
+| filesystem / tool など | あり | network のみ |
+| 取り込み | Alloy が JSONL を直接 tail | tem-pad が差分をイベント化 (`payload.count_delta`) |
 
-`auto` で native が検出されると Collector は何もせず、Alloy 側の設定 (`TEM_PAD_DOCKER_AUDIT_DIR`) が JSONL を読みます。両方を同時に収集して重複させないためです。
+`auto` で native が検出された場合、Collector は何もせず、Alloy (`TEM_PAD_DOCKER_AUDIT_DIR`) が JSONL を直接読みます。両方から収集してイベントが重複するのを防ぐためです。
 
 ## セキュリティ方針
 
 - secret を設定ファイルへ書かない。環境変数・外部コマンド (`security`, `pass-cli`)・0600 ファイルから実行時に読む。
-- secret をコマンド引数に渡さない。CLI の stderr は先頭のみをエラーに含める。
-- イベント・raw の保存前に共通 sanitizer を通し、secret らしいキー (`password`, `token`, …) を削除し、既知の secret 形式 (`tskey-…`, `pst_…`) を伏せ字にする。
-- `events/` `raw/` `state/` は 0700 / 0600 で作成する。raw は既定 180 日で自動削除し、source 単位で保存を止められる。
-- 外部コマンドの stderr はエラーメッセージに含める前に伏せ字化する。source ごとにプロセス間ロックを取り、二重実行を防ぐ。
-- Loki/Grafana は `127.0.0.1` にのみ bind。LAN へ公開しない。リモートは Tailscale Serve。
+- secret をコマンド引数に渡さない。
+- イベントと raw は保存前に共通 sanitizer に通し、secret らしいキー (`password`, `token`, …) を削除して、既知の secret 形式 (`tskey-…`, `pst_…`) を伏せ字にする。
+- `events/` `raw/` `state/` は 0700 / 0600 で作成する。raw は既定で 180 日後に自動削除し、source ごとに保存を止められる。
+- 外部コマンドの stderr は、先頭部分だけを伏せ字にしてからエラーメッセージに含める。
+- source ごとにプロセス間ロックを取り、二重実行を防ぐ。
+- Loki/Grafana は `127.0.0.1` にだけ bind し、LAN には公開しない。リモートからは Tailscale Serve で見る。
 - Docker socket やホスト全体を mount しない。
-- Little Snitch のためだけに全体を root で動かさない。sudoers で `littlesnitch log-traffic` だけを許可する。
+- Little Snitch のためだけに tem-pad 全体を root で動かさない。sudoers で `littlesnitch log-traffic` だけを許可する。
 - `events/` `raw/` `state/` は `.gitignore` 済み。
 
 ## 開発
@@ -156,11 +157,11 @@ uv run task test_cov
 uv run python scripts/make_sample_events.py   # fixture からサンプル JSONL を再生成
 ```
 
-外部仕様 (Tailscale API、pass-cli、Little Snitch CLI、sbx) について、指示書の想定と現行仕様の差分や、実機で未確認の点は [docs/implementation-notes.md](docs/implementation-notes.md) にまとめています。
+外部仕様 (Tailscale API、pass-cli、Little Snitch CLI、sbx) について、指示書の想定と現行仕様との違いや、実機で未確認の点を [docs/implementation-notes.md](docs/implementation-notes.md) にまとめています。
 
 ## 非目標 (MVP)
 
-独自 SIEM、IDS/IPS、packet capture、AI による異常判定、自動遮断、WAX610/ルーター syslog、NAS archive、モバイル/独自 Web UI は作りません。syslog は将来 Alloy の `loki.source.syslog` を足すだけで済む構造を意識しています。
+独自 SIEM、IDS/IPS、packet capture、AI による異常判定、自動遮断、WAX610/ルーター syslog、NAS archive、モバイル/独自 Web UI は作りません。syslog は、将来 Alloy に `loki.source.syslog` を追加するだけで対応できる構成にしています。
 
 ## ライセンス
 

@@ -24,7 +24,7 @@ class SecretRef:
 
     Attributes:
         env: 環境変数名。
-        command: 実行して標準出力 (1 行目) を値として使うコマンド。
+        command: 実行し、標準出力の 1 行目を値として使うコマンド。
         file: 値を 1 行で保持するファイルのパス。
     """
 
@@ -67,7 +67,7 @@ class SecretRef:
         """値を取り出す。取得元が未設定・空なら ``None``。
 
         Raises:
-            SecretError: コマンド失敗やファイル読み取り失敗。
+            SecretError: コマンドの失敗やファイルの読み取り失敗。
         """
         if self.env:
             value = os.environ.get(self.env, "")
@@ -86,7 +86,7 @@ class SecretRef:
 
 def _run_secret_command(command: tuple[str, ...], *, timeout: float) -> str | None:
     try:
-        # secret を返すコマンドは設定ファイルで利用者が明示したもののみ実行する
+        # 実行するのは利用者が設定ファイルで明示したコマンドだけ
         completed = subprocess.run(  # noqa: S603
             list(command),
             capture_output=True,

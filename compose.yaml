@@ -2,8 +2,8 @@
 #
 # - ポートは 127.0.0.1 にのみ bind し、LAN へは公開しない。
 #   リモート閲覧は Tailscale Serve を使う (docs/setup.md)。
-# - Grafana Alloy は macOS ネイティブで動かすためここには含めない
-#   (~/.local/share/tem-pad の JSONL をコンテナから読ませないため)。
+# - JSONL (~/.local/share/tem-pad) をコンテナから読ませないよう、
+#   Grafana Alloy は macOS 上で直接動かす (ここには含めない)。
 # - Docker socket やホスト全体の mount は行わない。
 #
 # 起動:   docker compose up -d
@@ -20,7 +20,7 @@ services:
       - ./deploy/loki/config.yaml:/etc/loki/config.yaml:ro
       - loki-data:/loki
     restart: unless-stopped
-    # 個人環境でホストを圧迫しないための控えめな上限。必要に応じて調整する
+    # ホストを圧迫しないよう控えめな上限にしている。必要に応じて調整する
     deploy:
       resources:
         limits:

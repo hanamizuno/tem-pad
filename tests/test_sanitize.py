@@ -34,7 +34,7 @@ def test_sanitize_redacts_known_secret_values_anywhere():
 
 def test_redact_text_leaves_normal_text():
     text = "connectCount,denyCount,tskey,pst_x,example.com"
-    assert redact_text(text) == text  # 接頭辞だけ・短すぎるものは対象外
+    assert redact_text(text) == text  # 接頭辞だけのものや短すぎるものは対象外
 
 
 def test_event_store_creates_private_files_and_dirs(tmp_path: Path):
@@ -45,7 +45,7 @@ def test_event_store_creates_private_files_and_dirs(tmp_path: Path):
     path = store.path_for("s")
     assert path.stat().st_mode & 0o777 == 0o600
     assert path.parent.stat().st_mode & 0o777 == 0o700
-    # 既存ファイルの緩い権限は append 時に直される
+    # 既存ファイルの緩い権限は append 時に修正される
     path.chmod(0o644)
     store.append(
         [Event(timestamp=datetime(2026, 9, 6, tzinfo=UTC), source="s", kind="k", event_id="b")]
@@ -74,7 +74,7 @@ def test_recent_event_ids_reads_tail(tmp_path: Path):
     ]
     events.append(Event(timestamp=datetime(2026, 9, 6, 1, tzinfo=UTC), source="s", kind="k"))
     store.append(events)
-    assert store.recent_event_ids("s", 3) == ["id8", "id9"]  # event_id None の行は除く
+    assert store.recent_event_ids("s", 3) == ["id8", "id9"]  # event_id が None の行は除く
     assert store.recent_event_ids("s", 100) == [f"id{i}" for i in range(10)]
     assert store.recent_event_ids("missing", 5) == []
     assert store.recent_event_ids("s", 0) == []

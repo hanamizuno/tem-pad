@@ -25,6 +25,6 @@ When the status of an ADR changes, update both the frontmatter `tags:` and the `
 
 ## Index
 
-* [0004-src-layout-and-top-level-tests.md](0004-src-layout-and-top-level-tests.md) — src レイアウトと top-level `tests/` を採用し、テンプレートの co-located tests 規約から変更した理由。
+* [0004-src-layout-and-top-level-tests.md](0004-src-layout-and-top-level-tests.md) — src レイアウトと top-level `tests/` を採用する (テンプレートの co-located tests 規約からの変更とその理由)。
 * [0003-jsonl-decoupled-pipeline.md](0003-jsonl-decoupled-pipeline.md) — Collector は Loki へ直接 push せず JSONL を介して Alloy に渡す。
 * [0002-coexist-sbx-with-devcontainer.md](0002-coexist-sbx-with-devcontainer.md) — Run sbx alongside the Dev Container as a staged migration, and the criteria for retiring the latter's agent tooling.

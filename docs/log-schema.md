@@ -44,7 +44,7 @@ Alloy は固定 label `schema="tem-pad-v1"` を付ける。Docker native audit �
 | `agent_write` | 変更系 action | 同上 |
 | `unknown` | action なし | 同上 |
 
-`actor` は Agent 名、`action` は監査記録の action (`ItemRead` 等)。`vault` / `vault_id` / `item` / `item_id` / `reason` は `proton_pass.redact_mode` で `sha256:<16 桁>` に置換 (`hash`) または null (`drop`) にできる。`reason_missing` は reason が空のときに true。
+`actor` は Agent 名、`action` は監査記録の action (`ItemRead` 等)。`vault` / `vault_id` / `item` / `item_id` / `reason` は `proton_pass.redact_mode` で `sha256:<16 桁>` への置換 (`hash`) か null 化 (`drop`) を選べる。`reason_missing` は reason が空なら true。
 
 ### little-snitch
 
@@ -53,7 +53,7 @@ Alloy は固定 label `schema="tem-pad-v1"` を付ける。Docker native audit �
 | `connection` | denyCount が 0 | `direction`, `uid`, `remote_ip`, `remote_host`, `protocol`, `protocol_number`, `port`, `connect_count`, `deny_count`, `bytes_in`, `bytes_out`, `executable`, `process`, `parent_app` |
 | `connection_denied` | denyCount > 0 | 同上 |
 
-`actor` は実行ファイル名 (`process`)、`action` は out なら `connect`、in なら `accept`、`decision` は deny の有無。CSV に未知の列があれば `extra` に入る。
+`actor` は実行ファイル名 (`process`)、`action` は out なら `connect`、in なら `accept`、`decision` は deny の有無で決まる。CSV に未知の列があれば `extra` に入れる。
 
 ### docker-sandbox (policy-log モード)
 
@@ -92,6 +92,6 @@ Docker の record schema そのまま。主なフィールド: `audit_event_id`,
 
 ## 互換性の方針
 
-- フィールドの追加は後方互換。削除・意味変更をする場合は Alloy の `schema` label の値を上げる。
+- フィールドの追加は後方互換とする。削除や意味の変更をするときは Alloy の `schema` label の値を上げる。
 - 未知のイベントは捨てず `kind="unknown"` または `payload.extra` / `payload.raw` に残す。
-- raw を保存しているので、schema 変更後の再 normalize が可能。
+- raw を保存しているので、schema の変更後に再 normalize できる。

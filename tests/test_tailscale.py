@@ -39,7 +39,7 @@ def test_normalize_audit_entries(now: datetime):
 
     unknown = events[3]
     assert unknown.kind == "audit_other"  # target なし・action あり
-    assert unknown.timestamp == now  # 壊れた時刻は取得時刻に倒す
+    assert unknown.timestamp == now  # 壊れた時刻は取得時刻で代用する
     assert unknown.event_id is not None
 
     ids = {event.event_id for event in events}
@@ -64,7 +64,7 @@ def test_diff_devices(now: datetime):
     changed = by_kind["device_changed"]
     assert set(changed.payload["changes"]) == {"keyExpiryDisabled"}
     assert by_kind["device_removed"].payload["hostname"] == "old-laptop"
-    # 差分イベントの ID は決定的で、同じ差分からは同じ ID が出る
+    # 差分イベントの ID は決定的 (同じ差分なら同じ ID)
     again = diff_devices(before, after, host="mac-studio", now=now + timedelta(hours=1))
     assert sorted(e.event_id or "" for e in again) == sorted(e.event_id or "" for e in events)
     assert all(e.event_id and e.event_id.startswith("device:") for e in events)
@@ -120,7 +120,7 @@ def test_collector_end_to_end_with_dedupe(
     raw_files = list((config.raw_dir / "tailscale").iterdir())
     assert len(raw_files) == 2
 
-    # 2 回目: 同じ監査ログ (overlap) + device 変化。devices_interval を過ぎたとみなす
+    # 2 回目: 同じ監査ログ (overlap) と device の変化。devices_interval は経過済みとみなす
     ctx.now = ctx.now + timedelta(minutes=15)
     stub.devices_data = devices_after
     second = run_collector(collector, ctx)
@@ -135,7 +135,7 @@ def test_collector_end_to_end_with_dedupe(
     assert kinds.count("device_removed") == 1
     assert kinds.count("device_changed") == 1
 
-    # overlap window が state の cursor から計算されている
+    # overlap window は state の cursor から計算される
     start, end = stub.calls[-2][1]
     assert end == ctx.now
     assert (ctx.now - timedelta(minutes=15) - start).total_seconds() == 60
@@ -203,7 +203,7 @@ def test_client_oauth_exchange(config: Config, monkeypatch: pytest.MonkeyPatch):
     client = TailscaleClient(config)
     assert client.devices() == [{"nodeId": "n1"}]
     assert "fields=all" in seen[1]["url"]
-    # トークンはリクエストのヘッダ以外 (URL 等) に現れない
+    # client secret は URL に含めない
     assert "csecret" not in seen[1]["url"]
 
 
@@ -241,14 +241,14 @@ def test_crash_between_append_and_state_save_does_not_duplicate(
     run_collector(collector, ctx)
     saved_state = ctx.states.load("tailscale")
 
-    # 2 回目: device 差分が出るが、state 保存に失敗したとみなして state を巻き戻す
+    # 2 回目: device 差分を書いた後、state の保存に失敗したとみなして state を巻き戻す
     ctx.now = ctx.now + timedelta(minutes=15)
     stub.devices_data = after
     second = run_collector(collector, ctx)
     assert second.written == 3
     ctx.states.save("tailscale", saved_state)
 
-    # 3 回目 (同じ差分の再計算): JSONL 末尾の ID から既読を復元し、何も書かない
+    # 3 回目: 同じ差分を再計算するが、JSONL 末尾の ID から既読を復元するので何も書かない
     third = run_collector(collector, ctx)
     assert third.written == 0
     assert third.duplicates == 3 + 4

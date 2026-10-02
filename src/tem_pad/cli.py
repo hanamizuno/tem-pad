@@ -101,7 +101,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def cmd_collect(config: Config, source: str, *, dry_run: bool) -> int:
-    """collect サブコマンド。1 つでも失敗があれば 1 を返す。"""
+    """collect サブコマンド。1 つでも失敗すれば 1 を返す。"""
     ctx = CollectorContext.from_config(config, dry_run=dry_run)
     collectors = all_collectors() if source == "all" else [get_collector(source)]
     exit_code = 0

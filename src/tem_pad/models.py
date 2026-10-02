@@ -1,8 +1,8 @@
 """共通イベントモデル (Envelope + source 固有 payload)。
 
 すべての Collector は取得した生データを :class:`Event` に正規化して
-JSONL として書き出す。Envelope の各フィールドは Loki の label 設計と
-対応しており、高 cardinality な値は必ず ``payload`` 側に入れる。
+JSONL として書き出す。Envelope の各フィールドは Loki の label 設計に
+対応するため、高 cardinality な値は必ず ``payload`` に入れる。
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, cast
 
-# kind の値は source ごとに定義するが、未知のイベントは必ずこの値を使う
+# kind は source ごとに定義する。未知のイベントには必ずこの値を使う
 KIND_UNKNOWN = "unknown"
 
 # decision の正規化済み値 (Loki label にするため種類を絞る)
@@ -29,7 +29,7 @@ def utc_now() -> datetime:
 def format_timestamp(value: datetime) -> str:
     """datetime を RFC 3339 (UTC, Z 終端) 文字列にする。
 
-    naive datetime は UTC として扱う。ミリ秒以下は保持する。
+    naive datetime は UTC とみなす。秒未満の値は保持する。
     """
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
@@ -41,13 +41,13 @@ def format_timestamp(value: datetime) -> str:
 def parse_timestamp(text: str) -> datetime:
     """RFC 3339 風の文字列を aware datetime (UTC) に変換する。
 
-    末尾 ``Z`` と ``+00:00`` の両方を受け付け、ナノ秒精度は
-    マイクロ秒に丸める。tz 情報がない場合は UTC とみなす。
+    末尾の ``Z`` と ``+00:00`` の両方を受け付け、ナノ秒精度は
+    マイクロ秒に切り詰める。タイムゾーンがなければ UTC とみなす。
     """
     raw = text.strip()
     if raw.endswith(("Z", "z")):
         raw = raw[:-1] + "+00:00"
-    # Python の fromisoformat は小数部 7 桁以上を受け付けないため丸める
+    # fromisoformat は小数部 7 桁以上を受け付けないため 6 桁に揃える
     if "." in raw:
         head, _, tail = raw.partition(".")
         digits = ""
@@ -67,10 +67,10 @@ def parse_timestamp(text: str) -> datetime:
 
 
 def normalize_decision(value: str | None) -> str | None:
-    """様々な表現の allow/deny を共通値へ寄せる。
+    """表記ゆれのある allow/deny を共通の値に正規化する。
 
     判定できない非空文字列は :data:`DECISION_UNKNOWN` にする。
-    ``None`` や空文字は ``None`` のまま (判定が存在しないイベント)。
+    ``None`` と空文字は判定のないイベントとして ``None`` を返す。
     """
     if value is None:
         return None
@@ -136,12 +136,12 @@ class Event:
         }
 
     def to_json(self) -> str:
-        """1 行の JSON 文字列にする (JSONL 用。改行を含まない)。"""
+        """JSONL 用に、改行を含まない 1 行の JSON 文字列にする。"""
         return json.dumps(self.to_dict(), ensure_ascii=False, separators=(",", ":"), default=str)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Event:
-        """:meth:`to_dict` の逆変換。inspect コマンド等で使う。"""
+        """:meth:`to_dict` の逆変換。inspect コマンドなどで使う。"""
         payload_raw = data.get("payload")
         payload: dict[str, Any] = (
             {str(k): v for k, v in cast("dict[Any, Any]", payload_raw).items()}

@@ -33,16 +33,16 @@ schema_config:
         period: 24h
 
 limits_config:
-  # 90 日で削除する (raw log は tem-pad 側で 180 日保持する想定)
+  # 90 日で削除する (raw は tem-pad 側で 180 日保持する想定)
   retention_period: 2160h
   # 収集は数分遅れで届くので、多少古いタイムスタンプも受け付ける
   reject_old_samples: true
   reject_old_samples_max_age: 168h
-  # label は source/host/kind/decision 程度に抑える設計なので少なめで十分
+  # label は source/host/kind/decision 程度に抑える設計なので、上限は少なめで十分
   max_label_names_per_series: 15
-  # Collector が構造化メタデータを使わないため無効化
+  # Collector は構造化メタデータを使わないので無効化
   allow_structured_metadata: false
-  # 収集した JSON をパースして検索する用途なので行長は多少大きく許容する
+  # JSON 全体を 1 行として保存し検索に使うため、行長の上限は大きめにする
   max_line_size: 256KB
   volume_enabled: true
   # Loki が job から自動生成する service_name label は使わない (label を最小限に保つ)

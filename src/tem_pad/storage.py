@@ -1,7 +1,7 @@
 """JSONL イベントストアと raw ログの保存。
 
 Collector は Loki へ直接 push せず、ここで書いた JSONL を Alloy が tail する。
-そのため書き込みは「1 イベント = 1 行」「行単位で完結」を守る。
+そのため「1 イベント = 1 行」で、各行が単独で完結するように書く。
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def ensure_private_file(path: Path) -> None:
 
 
 def atomic_write_text(path: Path, text: str, *, mode: int = PRIVATE_FILE_MODE) -> None:
-    """一時ファイルへ書いてから rename することで途中状態を残さない。"""
+    """一時ファイルに書いてから rename し、書きかけの状態を残さない。"""
     ensure_private_dir(path.parent)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     tmp_path = Path(tmp_name)
@@ -74,8 +74,8 @@ class EventStore:
     def append(self, events: Iterable[Event]) -> int:
         """イベントを追記し、書いた件数を返す。
 
-        時系列順に書くため timestamp で安定ソートする。source が混在して
-        いても、それぞれのファイルへ振り分ける。
+        source ごとのファイルに振り分け、timestamp で安定ソートして
+        時系列順に書く。
         """
         by_source: dict[str, list[Event]] = {}
         for event in events:
@@ -86,7 +86,7 @@ class EventStore:
             path = self.path_for(source)
             ensure_private_dir(path.parent)
             ensure_private_file(path)
-            # 監査ログは機微なので、新規ファイルは必ず 0600 で作る (umask に依存しない)
+            # 監査ログは機微情報を含むため、umask に関係なく新規ファイルは 0600 で作る
             fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, PRIVATE_FILE_MODE)
             with os.fdopen(fd, "a", encoding="utf-8") as handle:
                 for event in items:
@@ -100,8 +100,8 @@ class EventStore:
     def recent_event_ids(self, source: str, limit: int) -> list[str]:
         """JSONL 末尾 ``limit`` 行に含まれる event_id を古い順に返す。
 
-        state 保存前にプロセスが落ちた場合でも、書き終えたイベントの ID を
-        ここから復元して重複排除に使う。
+        state の保存前にプロセスが落ちても、書き終えたイベントの ID を
+        ここから復元して重複排除に使えるようにする。
         """
         path = self.path_for(source)
         if limit <= 0 or not path.exists():
@@ -146,7 +146,7 @@ class EventStore:
 
 
 def _tail_lines(path: Path, limit: int, *, block_size: int = 64 * 1024) -> list[str]:
-    """ファイル末尾から最大 ``limit`` 行を読む (先頭の行から順に返す)。"""
+    """ファイル末尾の最大 ``limit`` 行を、ファイル内の順序のまま返す。"""
     with path.open("rb") as handle:
         handle.seek(0, os.SEEK_END)
         position = handle.tell()
@@ -167,8 +167,8 @@ def _tail_lines(path: Path, limit: int, *, block_size: int = 64 * 1024) -> list[
 class RawStore:
     """取得した生データを ``raw/<source>/<timestamp>-<name>.<ext>`` に保存する。
 
-    再処理・証跡用。secret が含まれ得るデータは呼び出し側で取り除いてから
-    渡すこと (保存前に確認するのは Collector の責務)。
+    再処理や証跡に使う。secret の除去は Collector の責務なので、
+    呼び出し側で取り除いてから渡すこと。
     """
 
     def __init__(self, raw_dir: Path, *, disabled_sources: Iterable[str] = ()) -> None:

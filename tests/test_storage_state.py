@@ -94,7 +94,7 @@ def test_seen_ids_is_bounded_and_ordered():
     assert seen.add("b") is True
     assert seen.add("a") is False  # 既読
     assert seen.add("c") is True
-    assert seen.add("d") is True  # b が押し出される (a は再参照で新しくなった)
+    assert seen.add("d") is True  # a は再参照で新しくなったので b が押し出される
     assert "b" not in seen
     assert "a" in seen
     assert seen.to_list() == ["a", "c", "d"]

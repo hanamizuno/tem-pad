@@ -4,8 +4,8 @@
 
 * キー名ベース: ``password`` / ``token`` / ``secret`` などのキーを再帰的に削除する。
 * 値ベース: 既知の secret 形式 (Tailscale の ``tskey-…``、Proton Pass の
-  ``pst_…::…`` など) に一致する部分文字列を伏せ字にする。値が JSON の
-  どこに入っていても (監査ログの ``old`` / ``new`` など) 適用される。
+  ``pst_…::…`` など) に一致する部分文字列を伏せ字にする。JSON のどこに
+  ある値にも (監査ログの ``old`` / ``new`` など) 適用する。
 
 監査ログに secret が含まれない想定でも、将来の仕様変更や誤設定に備えて
 すべての source で使う。
@@ -57,5 +57,5 @@ def sanitize(data: Any) -> Any:  # noqa: ANN401
 
 
 def sanitize_dict(data: dict[str, Any]) -> dict[str, Any]:
-    """dict 用の型を保つラッパー。"""
+    """戻り値の型を dict のまま保つ :func:`sanitize` のラッパー。"""
     return cast("dict[str, Any]", sanitize(data))

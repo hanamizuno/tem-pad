@@ -5,11 +5,11 @@
 利用者アカウントでログインしたセッションが必要 (Agent 自身のセッションでは
 他 Agent のログは見えない)。
 
-secret (パスワード・トークン等) は監査記録に含まれない想定だが、
+secret (パスワードやトークンなど) は監査記録に含まれない想定だが、
 念のため疑わしいキーは保存前に取り除く。item / vault / reason は
-``redact_mode`` でハッシュ化・削除できる。
+``redact_mode`` でハッシュ化または削除できる。
 
-JSON の正確なフィールド名は CLI の版で変わり得るため、候補キーを
+JSON のフィールド名は CLI のバージョンで変わり得るため、候補キーを
 順に探す寛容なパーサにしている (docs/implementation-notes.md)。
 """
 
@@ -84,12 +84,12 @@ def first(record: dict[str, Any], keys: tuple[str, ...]) -> Any:  # noqa: ANN401
 
 
 def strip_secret_keys(data: Any) -> Any:  # noqa: ANN401
-    """secret らしいキーの削除と既知 secret 形式の伏せ字化 (共通 sanitizer)。"""
+    """共通 sanitizer で secret らしいキーを削除し、既知の secret 形式を伏せ字にする。"""
     return sanitize(data)
 
 
 def parse_json_output(text: str) -> Any:  # noqa: ANN401
-    """CLI の JSON 出力を解釈する。前後に人間向け行が混ざっても最初の JSON を拾う。"""
+    """CLI の JSON 出力を解釈する。先頭に人間向けの行が混ざっていても JSON 部分を拾う。"""
     stripped = text.strip()
     if not stripped:
         return None
@@ -97,7 +97,7 @@ def parse_json_output(text: str) -> Any:  # noqa: ANN401
         return json.loads(stripped)
     except json.JSONDecodeError:
         pass
-    # 先頭に警告行などが混ざる場合に備え、最初の [ または { から再試行する
+    # 警告行などが前にある場合に備え、最初の [ または { から再試行する
     for opener in ("[", "{"):
         index = stripped.find(opener)
         if index >= 0:
@@ -185,7 +185,7 @@ def redact(value: str | None, mode: str) -> str | None:
 
 
 def record_event_id(agent: str, record: dict[str, Any]) -> str:
-    """記録 ID があればそれを、無ければ内容ハッシュを使う。"""
+    """記録 ID があればそれを、なければ内容のハッシュを使う。"""
     record_id = first(record, _RECORD_ID_KEYS)
     if record_id is not None:
         return f"{agent}:{record_id}"
@@ -295,7 +295,7 @@ class ProtonPassCollector:
                 ctx.raw.write_json(SOURCE, f"monitor-{name}", strip_secret_keys(records))
             limit_reached = len(records) >= cfg.monitor_limit
             if limit_reached:
-                # 直近 N 件しか取れないため、実行間に N 件以上の記録があると取りこぼす
+                # 直近 N 件しか取れないので、前回の実行から N 件を超える記録があると取りこぼす
                 warnings.append(
                     f"agent {name!r} の monitor が monitor_limit ({cfg.monitor_limit}) 件に"
                     "達しました。取りこぼしの可能性があるため monitor_limit を増やすか"

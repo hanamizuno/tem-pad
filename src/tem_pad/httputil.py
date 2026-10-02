@@ -71,7 +71,7 @@ def form_encode(fields: Mapping[str, str]) -> bytes:
 
 
 def probe(url: str, *, timeout: float = 3.0) -> tuple[bool, str]:
-    """疎通確認。(成功したか, 説明) を返す。"""
+    """疎通を確認し、(成功したか, 説明) を返す。"""
     try:
         resp = request(url, timeout=timeout)
     except HttpError as exc:
