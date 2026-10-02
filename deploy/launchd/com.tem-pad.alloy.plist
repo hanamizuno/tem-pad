@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Grafana Alloy をユーザー権限で常駐させる LaunchAgent。
+  Homebrew の `brew services start alloy` を使う場合は不要。
+  こちらは環境変数で tem-pad 用の設定を渡したい場合に使う。
+
+  配置先: ~/Library/LaunchAgents/com.tem-pad.alloy.plist
+  __ALLOY_BIN__ (例: /opt/homebrew/bin/alloy)、__HOME__、__REPO__ は setup 時に置換する。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tem-pad.alloy</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__ALLOY_BIN__</string>
+    <string>run</string>
+    <string>--server.http.listen-addr=127.0.0.1:12345</string>
+    <string>--storage.path=__HOME__/.local/share/tem-pad/alloy</string>
+    <string>__REPO__/deploy/alloy/config.alloy</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TEM_PAD_DATA_DIR</key>
+    <string>__HOME__/.local/share/tem-pad</string>
+    <key>TEM_PAD_LOKI_URL</key>
+    <string>http://127.0.0.1:3100</string>
+    <key>TEM_PAD_HOST</key>
+    <string>__HOST__</string>
+    <!-- Docker AI Governance の native audit を使わない場合も、存在しない
+         ディレクトリを指していれば Alloy は何も読まないだけで害はない -->
+    <key>TEM_PAD_DOCKER_AUDIT_DIR</key>
+    <string>__HOME__/Library/Logs/com.docker.sandboxes/sandboxes/auditkit</string>
+  </dict>
+
+  <key>KeepAlive</key>
+  <true/>
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/tem-pad/alloy.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/tem-pad/alloy.err.log</string>
+</dict>
+</plist>

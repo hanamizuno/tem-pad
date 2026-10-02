@@ -1,0 +1,4 @@
+[
+  {"id": "pat_abc123", "name": "claude-dev", "expiration": "2026-10-01T00:00:00Z"},
+  {"id": "pat_def456", "name": "codex-ci", "expiration": "2026-12-01T00:00:00Z"}
+]

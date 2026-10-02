@@ -1,0 +1,77 @@
+# tem-pad の Loki / Grafana スタック (single-node)。
+#
+# - ポートは 127.0.0.1 にのみ bind し、LAN へは公開しない。
+#   リモート閲覧は Tailscale Serve を使う (docs/setup.md)。
+# - Grafana Alloy は macOS ネイティブで動かすためここには含めない
+#   (~/.local/share/tem-pad の JSONL をコンテナから読ませないため)。
+# - Docker socket やホスト全体の mount は行わない。
+#
+# 起動:   docker compose up -d
+# 停止:   docker compose down        (データは volume に残る)
+# 初期化: docker compose down -v     (Loki/Grafana のデータを削除)
+services:
+  loki:
+    image: grafana/loki:3.5.3
+    container_name: tem-pad-loki
+    command: ["-config.file=/etc/loki/config.yaml"]
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./deploy/loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    restart: unless-stopped
+    # 個人環境でホストを圧迫しないための控えめな上限。必要に応じて調整する
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          pids: 512
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3100/ready | grep -q ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    container_name: tem-pad-grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      # 管理者パスワードは .env (git 管理外) から渡す。例は example.env を参照
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD を .env に設定してください}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      # Tailscale Serve 経由で開く場合は .env で GRAFANA_ROOT_URL を上書きする
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://127.0.0.1:3000}
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      loki:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          pids: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  loki-data:
+  grafana-data:

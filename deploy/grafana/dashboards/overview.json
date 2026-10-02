@@ -1,0 +1,588 @@
+{
+  "uid": "tem-pad-overview",
+  "title": "tem-pad / Overview",
+  "description": "過去 24 時間の横断ビュー",
+  "tags": [
+    "tem-pad",
+    "overview"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "host",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "tem-pad-loki"
+        },
+        "query": {
+          "label": "host",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "type": 1
+        },
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".+",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2,
+        "sort": 1
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "title": "Overview",
+      "type": "link",
+      "url": "/d/tem-pad-overview"
+    },
+    {
+      "title": "AI Agent",
+      "type": "link",
+      "url": "/d/tem-pad-ai-agent"
+    },
+    {
+      "title": "Mac Network",
+      "type": "link",
+      "url": "/d/tem-pad-mac-network"
+    },
+    {
+      "title": "Tailscale",
+      "type": "link",
+      "url": "/d/tem-pad-tailscale"
+    }
+  ],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Tailscale 設定変更",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "unit": "short",
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum(count_over_time({source=\"tailscale\", kind=~\"audit_.*\", host=~\"$host\"}[$__range]))",
+          "queryType": "instant",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Tailnet 新規 device",
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "unit": "short",
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum(count_over_time({source=\"tailscale\", kind=\"device_added\", host=~\"$host\"}[$__range]))",
+          "queryType": "instant",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Proton Agent アクセス",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "purple"
+          },
+          "unit": "short",
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum(count_over_time({source=\"proton-pass\", host=~\"$host\"}[$__range]))",
+          "queryType": "instant",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Sandbox 通信 (行)",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "unit": "short",
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum(count_over_time({source=\"docker-sandbox\", host=~\"$host\"}[$__range]))",
+          "queryType": "instant",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Sandbox DENY",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "unit": "short",
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum(count_over_time({source=\"docker-sandbox\", decision=\"deny\", host=~\"$host\"}[$__range]))",
+          "queryType": "instant",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Little Snitch DENY",
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "sum"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "unit": "short",
+          "noValue": "0"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum(count_over_time({source=\"little-snitch\", decision=\"deny\", host=~\"$host\"}[$__range]))",
+          "queryType": "instant",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "イベント数 (source 別)",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum by (source) (count_over_time({source=~\".+\", host=~\"$host\"}[$__interval]))",
+          "legendFormat": "{{source}}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "要注意イベント (deny / 新規 device / policy・key 変更 / Agent 書き込み / reason なし)",
+      "description": "決定的なルールに基づく抽出。first-seen (初めて見た宛先) は Phase 2 で追加予定。",
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 12
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "{source=~\".+\", host=~\"$host\"} | json | decision=\"deny\" or kind=~\"device_added|audit_policy|audit_key|agent_write\" or payload_reason_missing=\"true\"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Tailscale 設定変更",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "{source=\"tailscale\", kind=~\"audit_.*|device_.*\", host=~\"$host\"} | json",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Proton Pass Agent",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "{source=\"proton-pass\", host=~\"$host\"} | json | line_format \"{{.actor}} {{.action}} {{.payload_vault}}/{{.payload_item}} reason={{.payload_reason}}\"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Docker Sandbox DENY",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "{source=\"docker-sandbox\", decision=\"deny\", host=~\"$host\"} | json | line_format \"{{.payload_sandbox}} -> {{.payload_remote_host}} ({{.payload_rule}} {{.payload_reason}})\"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Little Snitch DENY",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "{source=\"little-snitch\", decision=\"deny\", host=~\"$host\"} | json | line_format \"{{.payload_process}} -> {{.payload_remote_host}} {{.payload_remote_ip}}:{{.payload_port}}\"",
+          "queryType": "range"
+        }
+      ]
+    }
+  ]
+}

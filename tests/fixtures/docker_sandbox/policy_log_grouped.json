@@ -1,0 +1,8 @@
+{
+  "blocked": [
+    {"sandbox": "codex-repo", "type": "network", "host": "evil.example.org", "proxy": "network", "rule": "default-deny", "lastSeen": 1788000000, "count": 3}
+  ],
+  "allowed": [
+    {"sandbox": "codex-repo", "type": "network", "host": "pypi.org:443", "proxy": "forward-bypass", "rule": "domain-allowed", "lastSeen": 1788000010, "count": 7}
+  ]
+}

@@ -1,0 +1,5 @@
+date,direction,uid,ipAddress,remoteHostname,protocol,port,connectCount,denyCount,byteCountIn,byteCountOut,connectingExecutable,parentAppExecutable
+2026-09-06T08:00:00Z,out,501,203.0.113.10,api.anthropic.com,6,443,3,0,12000,4000,"/Applications/Docker.app/Contents/MacOS/com.docker.backend","/Applications/Docker.app/Contents/MacOS/Docker Desktop"
+2026-09-06T08:00:00Z,out,501,198.51.100.7,telemetry.example.net,6,443,0,2,0,0,"/Applications/Little Snitch.app/Contents/Components/Little Snitch Agent.app/Contents/MacOS/Little Snitch Agent",""
+2026-09-06T08:01:00Z,in,0,192.0.2.5,,17,5353,1,0,300,0,"/usr/sbin/mDNSResponder",""
+not-a-date,out,501,,,,,,,,,"",""

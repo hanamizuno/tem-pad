@@ -1,0 +1,55 @@
+{
+  "logs": [
+    {
+      "eventGroupID": "5a1f0c7a4d1e4b6f9c1d2e3f4a5b6c7d",
+      "origin": "ADMIN_CONSOLE",
+      "actor": {
+        "id": "uZ1a2b3CNTRL",
+        "loginName": "alice@example.com",
+        "displayName": "Alice",
+        "type": "USER"
+      },
+      "target": {
+        "id": "nQ9x8y7CNTRL",
+        "name": "mac-studio",
+        "type": "NODE",
+        "property": "KEY_EXPIRY_TIME"
+      },
+      "action": "UPDATE",
+      "old": "2026-12-01T00:00:00Z",
+      "new": "",
+      "eventTime": "2026-09-06T08:00:00.123456789Z"
+    },
+    {
+      "eventGroupID": "6b2f1d8b5e2f5c7a0d2e3f4a5b6c7d8e",
+      "origin": "ADMIN_CONSOLE",
+      "actor": {
+        "id": "uZ1a2b3CNTRL",
+        "loginName": "alice@example.com",
+        "displayName": "Alice",
+        "type": "USER"
+      },
+      "target": {
+        "id": "tailnet-example",
+        "name": "policy file",
+        "type": "POLICY_FILE"
+      },
+      "action": "UPDATE",
+      "eventTime": "2026-09-06T08:05:00Z"
+    },
+    {
+      "eventGroupID": "7c3a2e9c6f3a6d8b1e3f4a5b6c7d8e9f",
+      "origin": "API",
+      "actor": {"id": "kOAUTHCNTRL", "displayName": "ci-oauth-client", "type": "OAUTH_CLIENT"},
+      "target": {"id": "kAUTHKEY123", "name": "auth key", "type": "AUTH_KEY"},
+      "action": "CREATE",
+      "eventTime": "2026-09-06T08:10:00Z",
+      "someNewField": {"nested": true}
+    },
+    {
+      "eventGroupID": "8d4b3fa07a4b7e9c2f4a5b6c7d8e9f0a",
+      "action": "MYSTERY_ACTION",
+      "eventTime": "not a timestamp"
+    }
+  ]
+}

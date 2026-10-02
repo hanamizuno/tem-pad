@@ -15,4 +15,5 @@ Keep these documents complementary to the code and to `README.md` — record the
 ## Index
 
 * [devcontainer-agent-runtime.md](devcontainer-agent-runtime.md) — Dev Container as AI agent runtime: host config inheritance, isolation modes and limits, venv/cache isolation.
-* [sample-service-overview.md](sample-service-overview.md) — Sample. Replace with a real architecture note (or delete) once you have one.
+
+tem-pad 自体のアーキテクチャ (収集 → JSONL → Alloy → Loki → Grafana) は利用者向けドキュメント [/docs/architecture.md](/docs/architecture.md) にある。ここには Dev Container / sbx などの開発環境側のノートだけを置く。

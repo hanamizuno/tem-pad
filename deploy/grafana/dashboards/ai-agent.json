@@ -1,0 +1,340 @@
+{
+  "uid": "tem-pad-ai-agent",
+  "title": "tem-pad / AI Agent",
+  "description": "Docker Sandbox と Proton Pass を同じ時間軸で見る",
+  "tags": [
+    "tem-pad",
+    "agent"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "host",
+        "label": "host",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "tem-pad-loki"
+        },
+        "query": {
+          "label": "host",
+          "refId": "LokiVariableQueryEditor-VariableQuery",
+          "type": 1
+        },
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".+",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "refresh": 2,
+        "sort": 1
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [
+    {
+      "title": "Overview",
+      "type": "link",
+      "url": "/d/tem-pad-overview"
+    },
+    {
+      "title": "AI Agent",
+      "type": "link",
+      "url": "/d/tem-pad-ai-agent"
+    },
+    {
+      "title": "Mac Network",
+      "type": "link",
+      "url": "/d/tem-pad-mac-network"
+    },
+    {
+      "title": "Tailscale",
+      "type": "link",
+      "url": "/d/tem-pad-tailscale"
+    }
+  ],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Sandbox 通信 (decision 別) と Proton Agent アクセス",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum by (decision) (count_over_time({source=\"docker-sandbox\", host=~\"$host\"}[$__interval]))",
+          "legendFormat": "sandbox {{decision}}",
+          "queryType": "range"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum(count_over_time({source=\"proton-pass\", host=~\"$host\"}[$__interval]))",
+          "legendFormat": "proton-pass",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Agent × 宛先 domain (Sandbox)",
+      "description": "policy-log モードでは agent は sandbox 名からの推定",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Value",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum by (agent, domain, decision) (count_over_time({source=\"docker-sandbox\", host=~\"$host\"} | json | label_format agent=payload_agent, domain=payload_domain [$__range]))",
+          "queryType": "instant",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Agent × Vault/Item (Proton Pass)",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Value",
+            "desc": true
+          }
+        ]
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "sum by (agent, vault, item, action) (count_over_time({source=\"proton-pass\", host=~\"$host\"} | json | label_format agent=actor, vault=payload_vault, item=payload_item [$__range]))",
+          "queryType": "instant",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Docker Sandbox: Agent / Sandbox / Destination / Decision",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "{source=\"docker-sandbox\", host=~\"$host\"} | json | line_format \"{{.payload_agent}} {{.payload_sandbox}} -> {{.payload_remote_host}} [{{.decision}}] rule={{.payload_rule}} proxy={{.payload_proxy}} +{{.payload_count_delta}}\"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Proton Pass: Agent / Vault・Item / Action / Reason",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "{source=\"proton-pass\", host=~\"$host\"} | json | line_format \"{{.actor}} {{.action}} {{.payload_vault}}/{{.payload_item}} reason={{.payload_reason}}\"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Docker native audit (AI Governance がある場合のみ)",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "tem-pad-loki"
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "tem-pad-loki"
+          },
+          "expr": "{source=\"docker-sandbox\", schema=\"docker-audit-native\"} | json | line_format \"{{.agent}} {{.action_type}} {{.resource_id}} [{{.decision}}]\"",
+          "queryType": "range"
+        }
+      ]
+    }
+  ]
+}

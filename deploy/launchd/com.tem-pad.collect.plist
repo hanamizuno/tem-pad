@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  tem-pad collect all を 1 分ごとに実行する LaunchAgent (ユーザー権限)。
+  Tailscale / Proton Pass は Collector 内部で取得間隔を持つため、
+  短い周期で呼んでも API へ過剰にアクセスしない (docs/setup.md)。
+
+  配置先: ~/Library/LaunchAgents/com.tem-pad.collect.plist
+  __TEM_PAD_BIN__ と __HOME__ は setup 時に置換する (docs/setup.md 参照)。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tem-pad.collect</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__TEM_PAD_BIN__</string>
+    <string>collect</string>
+    <string>all</string>
+  </array>
+
+  <key>StartInterval</key>
+  <integer>60</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- Homebrew / uv / Docker Sandboxes の CLI を見つけるための PATH -->
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:__HOME__/.local/bin</string>
+    <!-- secret は環境変数に直書きせず、config.toml の command 参照
+         (macOS キーチェーン等) から読む -->
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/tem-pad/collect.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/tem-pad/collect.err.log</string>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>LowPriorityIO</key>
+  <true/>
+</dict>
+</plist>

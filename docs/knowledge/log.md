@@ -26,3 +26,8 @@ heading (`## YYYY-MM-DD`). Keep each bullet terse and link to the concrete file.
   * [runbooks/agent-sandbox-sbx.md](/docs/knowledge/runbooks/agent-sandbox-sbx.md) — YOLO override, clone mode, mounting, secrets, orchestration, auth troubleshooting, first-run checklist.
   * [research/sbx-verification.md](/docs/knowledge/research/sbx-verification.md) — verified-elsewhere vs. unverified-here facts.
   * [adr/0002-coexist-sbx-with-devcontainer.md](/docs/knowledge/adr/0002-coexist-sbx-with-devcontainer.md) — the coexistence decision and Dev Container retirement criteria.
+
+## 2026-09-06
+
+* tem-pad の初期実装 (Phase 1〜7)。ADR-0003 (JSONL 経由の疎結合パイプライン)、ADR-0004 (src レイアウト) を追加し、テンプレートのサンプル文書を削除。
+* ルートの `Dockerfile` / `.dockerignore` を復元。初期実装で不要と判断して削除したが、Dev Container が `devcontainer` ターゲットをビルドに使っており、Lint Docker (hadolint) も対象ファイルなしで失敗していた。

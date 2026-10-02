@@ -14,11 +14,11 @@ meta:
           - "CLAUDE.md"
           # GitHub config (workflows, templates, copilot-instructions.md, this file)
           - ".github/**"
-          # Containers
+          # Containers / deployment assets
           - "Dockerfile"
           - ".dockerignore"
-          - "compose.yml"
-          - "compose.dev.yml"
+          - "compose.yaml"
+          - "deploy/**"
           - ".devcontainer/**"
           # AI agent sandbox kits (Docker Sandboxes / sbx)
           - ".sandbox/**"

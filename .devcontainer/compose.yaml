@@ -1,7 +1,7 @@
 # Compose definition for the devcontainer only. devcontainer.json merges this
 # with compose.local.yaml (git-ignored local override; initialize.sh generates
-# a no-op stub when absent). NOT related to the root compose.yml (prod) or
-# compose.dev.yml (ad-hoc dev) — do not mix them up.
+# a no-op stub when absent). NOT related to the root compose.yaml (tem-pad's
+# Loki/Grafana stack) — do not mix them up.
 # The compose project directory is this file's directory (.devcontainer/), so
 # relative paths below are resolved from .devcontainer/.
 name: python-uv-template-devcontainer

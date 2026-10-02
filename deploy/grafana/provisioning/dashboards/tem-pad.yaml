@@ -1,0 +1,12 @@
+# deploy/grafana/dashboards/*.json を tem-pad フォルダとして読み込む。
+apiVersion: 1
+
+providers:
+  - name: tem-pad
+    type: file
+    folder: tem-pad
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
