@@ -1,7 +1,7 @@
 """外部コマンド実行の共通ヘルパー。
 
-secret を引数に渡さない・エラーメッセージに標準出力を丸ごと含めない、
-という方針をここで一元的に守る。
+secret を引数に渡さない、エラーメッセージに出力を丸ごと含めない、
+という方針をここでまとめて守る。
 """
 
 from __future__ import annotations
@@ -48,11 +48,11 @@ def run_command(
     check: bool = True,
     stderr_preview: int = 300,
 ) -> CommandResult:
-    """コマンドを実行し結果を返す。
+    """コマンドを実行して結果を返す。
 
     Args:
         command: 実行するコマンドと引数。
-        timeout: 秒。
+        timeout: タイムアウト (秒)。
         env: 追加・上書きする環境変数 (None なら継承のみ)。
         check: 非 0 終了を :class:`CommandError` にするか。
         stderr_preview: エラーに含める stderr の最大文字数。
@@ -87,7 +87,7 @@ def run_command(
         returncode=completed.returncode,
     )
     if check and completed.returncode != 0:
-        # stderr は原因調査に必要だが、secret が混ざる可能性に備えて伏せ字化してから含める
+        # stderr は原因調査に必要なので、secret が混ざっていても漏れないよう伏せ字にして含める
         preview = redact_text(completed.stderr.strip().replace("\n", " ")[:stderr_preview])
         raise CommandError(
             command,

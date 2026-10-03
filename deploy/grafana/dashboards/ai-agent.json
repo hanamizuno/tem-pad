@@ -127,7 +127,7 @@
     {
       "type": "table",
       "title": "Agent × 宛先 domain (Sandbox)",
-      "description": "policy-log モードでは agent は sandbox 名からの推定",
+      "description": "policy-log モードでは agent を sandbox 名から推定している",
       "gridPos": {
         "x": 0,
         "y": 7,

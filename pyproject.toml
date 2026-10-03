@@ -93,7 +93,7 @@ ignore = [
   "TC001",
   "TC002",
   "TC003",
-  # 例外メッセージを変数に切り出す規約は小規模 CLI では冗長
+  # 例外メッセージを変数に切り出す規約は、小規模な CLI では冗長
   "EM101",
   "EM102",
   "TRY003",
@@ -116,14 +116,14 @@ max-args = 10
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["D104"]  # Allow missing docstring in __init__.py
-"scripts/**" = ["INP001"]  # 単体スクリプト置き場。パッケージにしない
+"scripts/**" = ["INP001"]  # 単体スクリプトの置き場なのでパッケージにしない
 "tests/**" = [
   "S101", # Allow use of assert in tests
   "PLR2004", # Allow magic value in tests
   "D", # Docstrings not required in tests
   "ANN", # Type annotations not required in tests
   "INP001", # tests/ is intentionally not a package (pytest importlib mode)
-  "S108", # /tmp 風パスをテストデータとして使う
+  "S108", # /tmp 風のパスをテストデータに使う
   "ARG", # スタブ関数の未使用引数を許可
 ]
 

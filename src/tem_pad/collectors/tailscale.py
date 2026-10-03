@@ -7,8 +7,8 @@
 * device 一覧 (``GET /api/v2/tailnet/{tailnet}/devices``) を取得し、前回 state
   との差分から ``device_added`` / ``device_removed`` / ``device_changed`` を作る。
 
-認証は OAuth client (client credentials) を優先し、無ければ API access
-token を使う。secret は環境変数等から実行時に読み、ログ・raw に残さない。
+認証は OAuth client (client credentials) を優先し、なければ API access
+token を使う。secret は環境変数などから実行時に読み、ログや raw には残さない。
 
 外部仕様は docs/implementation-notes.md を参照。フィールド名は公式ドキュメント
 に基づくが、未知のフィールドはすべて payload に残す。
@@ -34,7 +34,7 @@ from tem_pad.secrets import SecretError
 
 SOURCE = "tailscale"
 
-# target.type の値からイベント種別へのざっくりした対応
+# target.type から kind への大まかな対応表
 _TARGET_KIND = (
     (("NODE", "DEVICE", "MACHINE"), "audit_device"),
     (("USER",), "audit_user"),
@@ -72,7 +72,7 @@ _AUDIT_KNOWN_KEYS = frozenset(
 
 
 class TailscaleAuthError(RuntimeError):
-    """認証情報が不足または無効。"""
+    """認証情報が不足しているか無効。"""
 
 
 def as_str_dict(value: Any) -> dict[str, Any]:  # noqa: ANN401
@@ -132,7 +132,7 @@ class TailscaleClient:
                 timeout=self.cfg.timeout_seconds,
             )
         except HttpError as exc:
-            # 本文に secret は含まれないが念のためステータスだけ伝える
+            # 本文に secret は含まれない想定だが、念のためステータスだけを伝える
             raise TailscaleAuthError(
                 f"OAuth token の取得に失敗しました (HTTP {exc.status})"
             ) from exc
@@ -142,7 +142,7 @@ class TailscaleClient:
         return token
 
     def get_json(self, path: str, params: dict[str, str] | None = None) -> Any:  # noqa: ANN401
-        """認証付き GET。"""
+        """認証付きで GET し、JSON を返す。"""
         url = f"{self.cfg.api_base_url}{path}"
         if params:
             url += "?" + urlencode(params)
@@ -154,7 +154,7 @@ class TailscaleClient:
         return resp.json()
 
     def configuration_audit_logs(self, start: datetime, end: datetime) -> list[dict[str, Any]]:
-        """設定監査ログを取得する。"""
+        """Configuration audit log を取得する。"""
         data = self.get_json(
             f"/api/v2/tailnet/{self.cfg.tailnet}/logging/configuration",
             {"start": format_timestamp(start), "end": format_timestamp(end)},
@@ -185,7 +185,7 @@ def audit_kind(entry: dict[str, Any]) -> str:
 
 
 def audit_event_id(entry: dict[str, Any]) -> str:
-    """エントリに一意 ID が無いため内容のハッシュを使う。"""
+    """エントリには一意な ID がないため、内容のハッシュを ID にする。"""
     canonical = json.dumps(entry, sort_keys=True, ensure_ascii=False, default=str)
     return "audit:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:32]
 
@@ -242,7 +242,7 @@ def normalize_audit_entry(entry: dict[str, Any], host: str, fallback_time: datet
 
 
 def device_snapshot(devices: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """差分比較用に device 一覧を nodeId キーの dict に縮約する。"""
+    """差分比較用に、device 一覧を nodeId をキーとする dict にまとめる。"""
     snapshot: dict[str, dict[str, Any]] = {}
     for device in devices:
         key = device.get("nodeId") or device.get("id")
@@ -293,8 +293,8 @@ def _normalize_value(value: Any) -> Any:  # noqa: ANN401
 def device_event_id(kind: str, node_id: str, content: dict[str, Any]) -> str:
     """device 差分イベントの決定的な ID。
 
-    同じスナップショット差分から同じ ID が出るので、state 保存前にプロセスが
-    落ちて同じ差分を再計算しても重複排除できる。
+    同じ差分からは同じ ID が得られるため、state の保存前にプロセスが落ちて
+    差分を再計算しても重複排除できる。
     """
     canonical = json.dumps(content, sort_keys=True, ensure_ascii=False, default=str)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]

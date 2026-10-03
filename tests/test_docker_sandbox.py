@@ -71,7 +71,7 @@ def test_effective_mode(tmp_path: Path):
     assert effective_mode(cfg) == "policy-log"
     (tmp_path / "auditkit").mkdir()
     (tmp_path / "auditkit" / "audit-x.tmp").write_text("{}")
-    assert effective_mode(cfg) == "policy-log"  # .tmp は未完成なので無視
+    assert effective_mode(cfg) == "policy-log"  # 書き込み途中の .tmp は無視する
     (tmp_path / "auditkit" / "audit-x.jsonl").write_text("{}")
     assert effective_mode(cfg) == "native"
     cfg.mode = "policy-log"
@@ -114,12 +114,12 @@ def test_policy_log_diff_across_runs(
     assert first.written == 2
     assert calls[0][1:4] == ["policy", "log", "--json"]
 
-    # 変化なし → イベントなし
+    # 変化がなければイベントも出ない
     second = run_collector(collector, ctx)
     assert second.written == 0
     assert second.fetched == 0
 
-    # count が増えた行だけイベント化され、増分が載る
+    # count が増えた行だけがイベントになり、増分が記録される
     rows[0]["count"] = 50
     rows[0]["last_seen"] = "2026-09-06T08:20:00Z"
     payloads["data"] = json.dumps(rows)

@@ -88,10 +88,10 @@ def test_window_initial_and_incremental(now: datetime):
     cursor = (now - timedelta(minutes=5)).isoformat()
     begin, end = window({"cursor": cursor}, now, cfg)
     assert begin == now - timedelta(minutes=6)
-    # 壊れた cursor は初回扱い
+    # 壊れた cursor は初回として扱う
     begin, _ = window({"cursor": "garbage"}, now, cfg)
     assert begin == end - timedelta(minutes=30)
-    # 長期停止後は 24 時間で打ち切り
+    # 長期停止後も遡るのは 24 時間まで
     old = (now - timedelta(days=10)).isoformat()
     begin, end = window({"cursor": old}, now, cfg)
     assert begin == end - timedelta(hours=24)
@@ -117,7 +117,7 @@ def test_collector_end_to_end(
     raw = list((config.raw_dir / "little-snitch").glob("*.csv"))
     assert len(raw) == 1
 
-    # overlap 再取得は重複として捨てられる
+    # overlap で再取得した分は重複として捨てる
     ctx.now = ctx.now + timedelta(minutes=1)
     second = run_collector(LittleSnitchCollector(), ctx)
     assert second.written == 0

@@ -49,7 +49,7 @@ cover/
 .devcontainer/compose.local.yaml
 
 # tem-pad: runtime data must never be committed
-# (実データは ~/.local/share/tem-pad に置く。リポジトリ内に作ってしまった場合も除外する)
+# (実データは ~/.local/share/tem-pad に置く。誤ってリポジトリ内に作った場合に備えて除外する)
 /events/
 /raw/
 /state/

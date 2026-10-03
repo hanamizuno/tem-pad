@@ -1,7 +1,6 @@
 """``tem-pad doctor``: 実行環境と各連携先の状態を診断する。
 
-credential の値そのものは決して出力しない。NG のときは次に何をすべきか
-分かるメッセージ (hint) を付ける。
+credential の値は出力しない。NG のときは次に取るべき対応を hint として示す。
 """
 
 from __future__ import annotations
@@ -162,5 +161,5 @@ def is_macos() -> bool:
 
 
 def env_flag(name: str) -> bool:
-    """環境変数が空でなくセットされているか (値は返さない)。"""
+    """環境変数に空でない値が設定されているか (値自体は返さない)。"""
     return bool(os.environ.get(name))

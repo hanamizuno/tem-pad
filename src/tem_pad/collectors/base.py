@@ -1,8 +1,8 @@
 """Collector の共通インターフェースと実行ラッパー。
 
-各 Collector は :class:`Collector` プロトコルを実装し、
-``collect()`` で :class:`Event` のリストを返す。重複排除・JSONL 追記・
-state 保存は :func:`run_collector` が一括で行う。
+各 Collector は :class:`Collector` プロトコルを実装し、``collect()`` で
+:class:`Event` のリストを含む :class:`CollectOutput` を返す。重複排除・
+JSONL への追記・state の保存は :func:`run_collector` がまとめて行う。
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class CollectorContext:
     raw: RawStore
     states: StateStore
     now: datetime = field(default_factory=utc_now)
-    # True なら書き込みを行わず、取得と正規化だけ実施する
+    # True なら取得と正規化だけ行い、書き込まない
     dry_run: bool = False
 
     @classmethod
@@ -73,7 +73,7 @@ class CollectResult:
 
 @dataclass(slots=True)
 class CollectOutput:
-    """Collector が返す生の結果。"""
+    """Collector が返す結果 (重複排除前)。"""
 
     events: list[Event]
     # 保存する state。None なら state を更新しない (取得失敗時など)
@@ -110,8 +110,8 @@ class LockBusyError(RuntimeError):
 def source_lock(states: StateStore, source: str) -> Generator[None]:
     """source 単位のプロセス間ロック (``state/<source>.lock`` への flock)。
 
-    launchd の定期実行と手動実行が重なったときに、同じ state を読んで同じ
-    イベントを二重に書くのを防ぐ。取得できなければ待たずに
+    launchd の定期実行と手動実行が重なっても、同じ state を読んで同じ
+    イベントを二重に書かないようにする。ロックを取れなければ待たずに
     :class:`LockBusyError` を送出する。
     """
     lock_path = states.path_for(source).with_suffix(".lock")
@@ -130,8 +130,8 @@ def source_lock(states: StateStore, source: str) -> Generator[None]:
 def run_collector(collector: Collector, ctx: CollectorContext) -> CollectResult:
     """Collector を実行し、重複排除・書き込み・state 保存まで行う。
 
-    Collector 内の例外はここで捕まえ、結果に ``error`` として載せる。
-    ``collect all`` で 1 つの失敗が他へ波及しないようにするため。
+    ``collect all`` で 1 つの失敗が他に波及しないよう、Collector 内の例外は
+    ここで捕まえて結果の ``error`` に入れる。
     """
     result = CollectResult(source=collector.name)
     if not collector.enabled(ctx.config):
@@ -146,7 +146,7 @@ def run_collector(collector: Collector, ctx: CollectorContext) -> CollectResult:
         result.skip_reason = str(exc)
         return result
     except OSError as exc:
-        # state / JSONL の読み書き失敗も 1 source の失敗として封じ込める
+        # state や JSONL の読み書き失敗も、その source だけの失敗として扱う
         logger.exception("collector %s storage failure", collector.name)
         result.error = f"{type(exc).__name__}: {exc}"
         return result
@@ -171,7 +171,7 @@ def _run_locked(
         return result
 
     seen = SeenIds.from_state(state, limit=ctx.config.general.dedupe_window)
-    # 前回 append 後・state 保存前に落ちた場合に備え、JSONL 末尾の ID も既読に加える
+    # 前回 append 後、state 保存前に落ちた場合に備えて JSONL 末尾の ID も既読に加える
     for event_id in ctx.events.recent_event_ids(collector.name, ctx.config.general.dedupe_window):
         seen.add(event_id)
     fresh: list[Event] = []

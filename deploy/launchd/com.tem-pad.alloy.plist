@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Grafana Alloy をユーザー権限で常駐させる LaunchAgent。
-  Homebrew の `brew services start alloy` を使う場合は不要。
-  こちらは環境変数で tem-pad 用の設定を渡したい場合に使う。
+  Homebrew の `brew services start alloy` で起動する場合は不要。
+  tem-pad 用の設定を環境変数で渡したいときに使う。
 
   配置先: ~/Library/LaunchAgents/com.tem-pad.alloy.plist
   __ALLOY_BIN__ (例: /opt/homebrew/bin/alloy)、__HOME__、__REPO__ は setup 時に置換する。
@@ -29,8 +29,8 @@
     <string>http://127.0.0.1:3100</string>
     <key>TEM_PAD_HOST</key>
     <string>__HOST__</string>
-    <!-- Docker AI Governance の native audit を使わない場合も、存在しない
-         ディレクトリを指していれば Alloy は何も読まないだけで害はない -->
+    <!-- Docker AI Governance の native audit を使わない場合、存在しない
+         ディレクトリを指していても Alloy が何も読まないだけで問題ない -->
     <key>TEM_PAD_DOCKER_AUDIT_DIR</key>
     <string>__HOME__/Library/Logs/com.docker.sandboxes/sandboxes/auditkit</string>
   </dict>

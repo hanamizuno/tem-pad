@@ -3,8 +3,8 @@
 state は ``state/<source>.json`` に保存する。書き込みは atomic に行い、
 Collector が途中で落ちても壊れた JSON を残さない。
 
-重複排除は「最近見た event_id の有界リスト」で行う。API の overlap
-window で同じイベントを再取得しても、この集合に含まれていれば捨てる。
+重複排除には、最近見た event_id を上限付きで保持するリストを使う。
+overlap で同じイベントを再取得しても、このリストにあれば捨てる。
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ class StateStore:
 
 
 class SeenIds:
-    """有界の既読 event_id 集合。挿入順を保ち、古いものから捨てる。"""
+    """上限付きの既読 event_id 集合。挿入順を保ち、上限を超えたら古いものから捨てる。"""
 
     def __init__(self, ids: Iterable[str] = (), *, limit: int = 5000) -> None:
         """Args: ids: 初期 ID 列。limit: 保持する最大件数。"""
@@ -67,7 +67,7 @@ class SeenIds:
         return len(self._ids)
 
     def add(self, value: str) -> bool:
-        """ID を追加する。新規なら ``True``、既読なら ``False``。"""
+        """ID を追加する。新規なら ``True``、既読なら ``False`` を返す。"""
         if value in self._ids:
             self._ids.move_to_end(value)
             return False

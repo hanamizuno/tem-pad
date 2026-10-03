@@ -1,12 +1,11 @@
 // Grafana Alloy 設定 (macOS ネイティブ実行)。
 //
-// 責務は「tem-pad が書いた正規化 JSONL を tail し、少数の label を付けて
-// Loki へ送る」ことだけ。normalize は tem-pad 側で行い、ここに business
-// logic を持ち込まない。
+// 役割は、tem-pad が書いた正規化済み JSONL を tail し、少数の label を付けて
+// Loki へ送ることだけ。正規化は tem-pad 側で行い、ここにはロジックを持ち込まない。
 //
-// 配置: deploy/alloy/config.alloy をそのまま使い、環境依存の値は
-// TEM_PAD_DATA_DIR / TEM_PAD_LOKI_URL / TEM_PAD_HOST 環境変数で差し込む
-// (docs/setup.md)。既定値は ~/.local/share/tem-pad と http://127.0.0.1:3100。
+// 配置: deploy/alloy/config.alloy をそのまま使い、環境依存の値は環境変数
+// TEM_PAD_DATA_DIR / TEM_PAD_LOKI_URL / TEM_PAD_HOST で渡す (docs/setup.md)。
+// 既定値は ~/.local/share/tem-pad と http://127.0.0.1:3100。
 
 // ---------------------------------------------------------------------------
 // 1. tem-pad の正規化 JSONL (events/<source>.jsonl)
@@ -24,16 +23,16 @@ loki.source.file "tem_pad_events" {
   targets    = local.file_match.tem_pad_events.targets
   forward_to = [loki.process.tem_pad_events.receiver]
 
-  // 位置情報は Alloy の --storage.path 配下に保存されるため、Alloy 再起動後も
-  // 続きから読める。tail_from_end=false で、新規ファイルは先頭から読む。
+  // 読み取り位置は Alloy の --storage.path 配下に保存されるので、再起動後も
+  // 続きから読める。新規ファイルは先頭から読む (tail_from_end=false)。
   tail_from_end = false
 }
 
 loki.process "tem_pad_events" {
   forward_to = [loki.write.default.receiver]
 
-  // Envelope から label 候補だけを抜き出す。高 cardinality な値 (domain, IP,
-  // item, sandbox ID など) は payload に留めて label にしない。
+  // Envelope から label にする値だけを抜き出す。高 cardinality な値 (domain, IP,
+  // item, sandbox ID など) は payload に残し、label にはしない。
   stage.json {
     expressions = {
       ts       = "timestamp",
@@ -51,10 +50,10 @@ loki.process "tem_pad_events" {
     action_on_failure = "fudge"
   }
 
-  // decision は null のイベントが多い。値があるときだけ label にする
-  // (無条件に stage.labels へ渡すと "<no value>" という label 値が付いてしまう)。
+  // decision は null のイベントが多いので、値があるときだけ label にする
+  // (無条件に stage.labels へ渡すと label 値が "<no value>" になる)。
   stage.match {
-    // match の selector は行フィルタのみ使える (| json は不可)。JSONL は空白なしで
+    // match の selector では行フィルタしか使えない (| json は不可)。JSONL は空白なしで
     // 書かれるので、"decision":"allow" のような部分文字列で判定する
     selector = `{job="tem-pad"} |~ "\"decision\":\"(allow|deny|unknown)\""`
     stage.labels {
@@ -78,7 +77,7 @@ loki.process "tem_pad_events" {
     }
   }
 
-  // filename label はファイルのローテーションで増えるだけなので落とす
+  // filename label はローテーションのたびに値が増えるだけなので落とす
   stage.label_drop {
     values = ["filename"]
   }
@@ -86,7 +85,7 @@ loki.process "tem_pad_events" {
 
 // ---------------------------------------------------------------------------
 // 2. Docker Sandboxes native audit JSONL (利用できる場合のみ)
-//    完成した .jsonl だけを読む。.tmp は書き込み中なので対象にしない。
+//    書き込みが完了した .jsonl だけを読み、書き込み中の .tmp は対象外とする。
 // ---------------------------------------------------------------------------
 
 local.file_match "docker_sandbox_audit" {
@@ -105,7 +104,7 @@ loki.source.file "docker_sandbox_audit" {
 loki.process "docker_sandbox_audit" {
   forward_to = [loki.write.default.receiver]
 
-  // native record を tem-pad Envelope 相当の label に寄せる。
+  // native record の項目を tem-pad の Envelope と同じ label に揃える。
   //   action_type -> kind, decision (AUDIT_DECISION_*) -> allow/deny
   stage.json {
     expressions = {

@@ -131,7 +131,7 @@ def test_collector_end_to_end(
         joined = " ".join(cmd)
         assert "PROTON_PASS_PERSONAL_ACCESS_TOKEN" not in joined
 
-    # raw に secret が漏れていない
+    # raw に secret が漏れない
     raw_dir = config.raw_dir / "proton-pass"
     assert not any("MUST-NOT-BE-STORED" in p.read_text() for p in raw_dir.iterdir())
 
@@ -151,7 +151,7 @@ def test_collector_agent_filter_and_partial_failure(
     fake, calls = _stub_run_command({"agent list": agents}, failures={"codex-ci"})
     monkeypatch.setattr("tem_pad.collectors.proton_pass.run_command", fake)
     result = run_collector(ProtonPassCollector(), ctx)
-    assert result.ok  # monitor の失敗は warning に留める
+    assert result.ok  # monitor の失敗は warning 扱い
     assert result.written == 0
     assert any("codex-ci" in w for w in result.warnings)
     assert len(calls) == 2
@@ -170,7 +170,7 @@ def test_collector_list_failure(ctx: CollectorContext, monkeypatch: pytest.Monke
 def test_monitor_limit_reached_warns(
     ctx: CollectorContext, config: Config, monkeypatch: pytest.MonkeyPatch
 ):
-    config.proton_pass.monitor_limit = 4  # fixture は 4 件なので上限到達
+    config.proton_pass.monitor_limit = 4  # fixture は 4 件なので上限に達する
     agents = json.dumps(load_fixture("proton_pass", "agent_list.json"))
     monitor = json.dumps(load_fixture("proton_pass", "agent_monitor.json"))
     fake, _calls = _stub_run_command({"agent list": agents, "agent monitor": monitor})

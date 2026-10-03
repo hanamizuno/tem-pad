@@ -1,18 +1,18 @@
 """Docker Sandboxes Collector。
 
-2 方式を扱う。
+次の 2 方式に対応する。
 
 * **native**: Docker AI Governance の native audit JSONL
   (``~/Library/Logs/com.docker.sandboxes/sandboxes/auditkit/*.jsonl``) が
   ある場合。Collector は何もせず、Grafana Alloy が直接 tail する
-  (deploy/alloy/config.alloy)。完成した ``.jsonl`` のみ読み ``.tmp`` は
-  読まない。
+  (deploy/alloy/config.alloy)。読むのは書き込み済みの ``.jsonl`` だけで、
+  ``.tmp`` は読まない。
 * **policy-log**: ``sbx policy log --json`` の出力から正規化する fallback。
   native audit は有償の AI Governance プランと組織ポリシーが前提で、
   個人アカウントでは生成されないため、個人環境では通常こちらになる。
 
-``sbx policy log`` は sandbox・host・判定の組ごとの集計 (件数と最終時刻)
-であり、接続ごとの記録ではない。そのため前回スナップショットとの差分で
+``sbx policy log`` は接続ごとの記録ではなく、sandbox・host・判定の組ごとの
+集計 (件数と最終時刻) である。そのため前回のスナップショットとの差分から
 イベントを作り、count の増分を payload に載せる。
 """
 
@@ -85,7 +85,7 @@ def native_audit_dir(cfg: DockerSandboxConfig) -> Path:
 
 
 def native_audit_available(cfg: DockerSandboxConfig) -> bool:
-    """完成済み ``.jsonl`` が 1 つ以上あれば native audit が有効とみなす。"""
+    """``.jsonl`` が 1 つ以上あれば native audit が有効とみなす。"""
     directory = native_audit_dir(cfg)
     if not directory.is_dir():
         return False
@@ -126,10 +126,11 @@ def _implied_decision(text: str) -> str | None:
 
 
 def parse_policy_log(data: Any) -> list[dict[str, Any]]:  # noqa: ANN401
-    """``sbx policy log --json`` の出力を (decision 付きの) 行リストにする。
+    """``sbx policy log --json`` の出力を行のリストにする。
 
     配列そのもの、``{"blocked": [...], "allowed": [...]}`` 形式、
-    ``{"entries": [...]}`` 形式のいずれにも対応する。
+    ``{"entries": [...]}`` 形式のいずれにも対応する。``blocked`` のような
+    キー名から判定が分かる場合は、各行に decision を補う。
     """
     if isinstance(data, list):
         return [as_str_dict(item) for item in cast("list[Any]", data) if isinstance(item, dict)]
@@ -192,7 +193,7 @@ def _int(value: Any) -> int | None:  # noqa: ANN401
 
 
 def row_timestamp(row: dict[str, Any], fallback: datetime) -> datetime:
-    """last_seen を時刻にする。解釈できなければ取得時刻。"""
+    """last_seen を datetime にする。解釈できなければ ``fallback`` (取得時刻) を返す。"""
     value = first(row, _LAST_SEEN_KEYS)
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         seconds = float(value)
@@ -259,7 +260,7 @@ def normalize_row(
 
 
 def _guess_agent(sandbox: str) -> str | None:
-    """sandbox 名の先頭要素を Agent 名の推定値として返す (claude-repo なら claude)。"""
+    """sandbox 名のハイフン区切りの先頭を Agent 名と推定する (claude-repo なら claude)。"""
     head = sandbox.split("-", 1)[0].strip()
     return head or None
 

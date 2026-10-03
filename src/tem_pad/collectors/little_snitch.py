@@ -3,13 +3,13 @@
 ``littlesnitch log-traffic --begin-date ... --end-date ...`` の CSV 出力を
 poll 方式で取得し、1 行 = 1 イベントにする。Little Snitch の CLI は
 多くの操作で root を要求するため、既定では ``sudo -n`` 経由で呼ぶ。
-sudoers には ``littlesnitch log-traffic *`` だけを許可する
+sudoers で許可するのは ``littlesnitch log-traffic *`` だけにする
 (docs/setup.md)。tem-pad 自体は root で動かさない。
 
 CSV のカラム名は Little Snitch 5/6 で公開されているもの (date, direction,
 uid, ipAddress, remoteHostname, protocol, port, connectCount, denyCount,
 byteCountIn, byteCountOut, connectingExecutable, parentAppExecutable) を
-基準にし、ヘッダ行から動的に読むので順序変更や追加カラムには耐える。
+基準にする。カラムはヘッダ行から動的に特定するため、並び替えや追加にも対応できる。
 """
 
 from __future__ import annotations
@@ -182,7 +182,7 @@ def window(
             begin = None
     if begin is None:
         begin = end - timedelta(minutes=cfg.initial_lookback_minutes)
-    # 長期停止後に巨大な区間を取らないよう 24 時間で打ち切る
+    # 長期停止後に巨大な区間を取得しないよう、最大 24 時間に制限する
     begin = max(begin, end - timedelta(hours=24))
     return begin, end
 
@@ -197,7 +197,7 @@ class LittleSnitchCollector:
         return config.little_snitch.enabled
 
     def collect(self, ctx: CollectorContext, state: dict[str, Any]) -> CollectOutput:
-        """前回終端から現在 (少し手前) までの通信履歴を取得する。"""
+        """前回の終端から現在の少し手前までの通信履歴を取得する。"""
         cfg = ctx.config.little_snitch
         begin, end = window(state, ctx.now, cfg)
         if end <= begin:

@@ -49,17 +49,17 @@ class TailscaleConfig:
     enabled: bool = True
     # 取得した生データを raw/ に保存するか
     save_raw: bool = True
-    # ハイフン 1 文字は「API 資格情報が属する tailnet」を意味する Tailscale の省略記法
+    # "-" は「認証情報が属する tailnet」を表す Tailscale の省略記法
     tailnet: str = "-"
     api_base_url: str = "https://api.tailscale.com"
-    # 監査ログを前回終端の何秒前から重ねて取るか。API 側の遅延に備える
+    # 監査ログを前回の終端から何秒さかのぼって重ねて取得するか (API 側の反映遅延に備える)
     audit_overlap_seconds: int = 60
-    # 初回実行時に何時間前まで遡って取るか
+    # 初回実行時にさかのぼる時間
     audit_initial_lookback_hours: int = 24
-    # 1 回の取得で遡る最大時間。長期停止後の巨大取得を避ける
+    # 1 回の取得でさかのぼる最大時間。長期停止後の大量取得を避ける
     audit_max_window_hours: int = 24 * 7
-    # device 一覧の取得間隔の秒数。collect tailscale をより短い周期で呼んでも
-    # この間隔未満なら device 取得はスキップする
+    # device 一覧の取得間隔 (秒)。collect tailscale をこれより短い周期で実行しても、
+    # 間隔に満たなければ device の取得は省く
     devices_interval_seconds: int = 600
     oauth_client_id: SecretRef = field(
         default_factory=lambda: SecretRef(env="TAILSCALE_OAUTH_CLIENT_ID")
@@ -81,9 +81,9 @@ class ProtonPassConfig:
     enabled: bool = True
     save_raw: bool = True
     cli_path: str = "pass-cli"
-    # agent monitor の --limit。Agent ごとの前回位置から差分を取る
+    # Agent ごとに取得する直近の記録件数 (agent monitor の --limit)
     monitor_limit: int = 200
-    # 収集対象を絞る場合に Agent 名を列挙する (空なら全 Agent)
+    # 収集対象の Agent 名 (空なら全 Agent)
     agents: list[str] = field(default_factory=_empty_str_list)
     # item・vault・reason を保存前に加工する方式 (plain, hash, drop のいずれか)
     redact_mode: str = "plain"
@@ -97,9 +97,9 @@ class LittleSnitchConfig:
     enabled: bool = True
     save_raw: bool = True
     cli_path: str = DEFAULT_LITTLE_SNITCH_CLI
-    # littlesnitch は多くの操作で root を要求する。sudo 経由で実行するか
+    # littlesnitch を sudo 経由で実行するか (多くの操作で root が必要)
     use_sudo: bool = True
-    # 前回取得終端から何秒前まで重ねて取り直すか
+    # 前回の終端から何秒さかのぼって重ねて取得するか
     overlap_seconds: int = 60
     initial_lookback_minutes: int = 60
     timeout_seconds: float = 120.0
@@ -148,7 +148,7 @@ class Config:
 
     @property
     def raw_dir(self) -> Path:
-        """raw log の置き場所。"""
+        """raw ログの置き場所。"""
         return self.general.data_dir / "raw"
 
     @property
@@ -187,7 +187,7 @@ def resolve_config_path(explicit: str | os.PathLike[str] | None = None) -> Path:
 
 
 def load_config(path: str | os.PathLike[str] | None = None) -> Config:
-    """設定ファイルを読み込む。存在しない場合は既定値で構成する。"""
+    """設定ファイルを読み込む。ファイルがなければ既定値を使う。"""
     resolved = resolve_config_path(path)
     if resolved.exists():
         with resolved.open("rb") as handle:

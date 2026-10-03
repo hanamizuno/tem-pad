@@ -417,7 +417,7 @@
     {
       "type": "logs",
       "title": "要注意イベント (deny / 新規 device / policy・key 変更 / Agent 書き込み / reason なし)",
-      "description": "決定的なルールに基づく抽出。first-seen (初めて見た宛先) は Phase 2 で追加予定。",
+      "description": "固定のルールで抽出している。first-seen (初めて見る宛先) は Phase 2 で追加予定。",
       "gridPos": {
         "x": 0,
         "y": 11,

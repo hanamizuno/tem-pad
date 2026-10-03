@@ -19,8 +19,8 @@ timestamp: 2026-09-06T00:00:00Z
 
 ## 理由
 
-- fixture を source 横断で扱う (`scripts/make_sample_events.py` がサンプル JSONL を生成する) ため、1 か所にある方が扱いやすい。
-- `uv tool install .` で editable でない wheel を作るとき、src レイアウトならテストや fixture が wheel に混入しない。
+- fixture は source をまたいで使う (`scripts/make_sample_events.py` がサンプル JSONL を生成する) ため、1 か所にまとまっている方が都合がよい。
+- `uv tool install .` で editable でない wheel をビルドする際、src レイアウトならテストや fixture が wheel に混入しない。
 
 ## 影響
 
